@@ -1,0 +1,540 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum HeroClass {
+  VANGUARD
+  RANGER
+  MYSTIC
+}
+
+enum HeroRarity {
+  COMMON
+  UNCOMMON
+  RARE
+}
+
+enum HeroStatus {
+  AVAILABLE
+  ON_EXPEDITION
+}
+
+enum ItemType {
+  WEAPON
+  ARMOR
+  ACCESSORY
+  TROPHY
+}
+
+enum ItemRarity {
+  COMMON
+  UNCOMMON
+  RARE
+  EPIC
+}
+
+enum EquipmentSlot {
+  WEAPON
+  ARMOR
+  ACCESSORY
+}
+
+enum InventoryItemState {
+  AVAILABLE
+  EQUIPPED
+  RESERVED
+  CONSUMED
+}
+
+enum ReservationType {
+  EXPEDITION
+  MARKET
+  TRADE
+}
+
+enum ResourceType {
+  IRON_ORE
+  HERBS
+  LEATHER
+  ARCANE_DUST
+}
+
+enum RewardType {
+  GOLD
+  GUILD_XP
+  ITEM
+  RESOURCE
+}
+
+enum ExpeditionStatus {
+  ACTIVE
+  COMPLETED
+  CLAIMED
+  CANCELLED
+}
+
+enum ExpeditionResultTier {
+  TRIUMPH
+  SUCCESS
+  SETBACK
+  FAILURE
+}
+
+enum ListingType {
+  ITEM
+  RESOURCE
+}
+
+enum MarketListingStatus {
+  ACTIVE
+  SOLD
+  CANCELLED
+  EXPIRED
+}
+
+enum BuyOrderStatus {
+  ACTIVE
+  FULFILLED
+  CANCELLED
+  EXPIRED
+}
+
+enum MarketClaimType {
+  GOLD
+  ITEM
+  RESOURCE
+}
+
+enum MarketClaimSourceType {
+  SOLD_LISTING
+  EXPIRED_LISTING
+  CANCELLED_LISTING
+  FILLED_BUY_ORDER
+  CANCELLED_BUY_ORDER
+  EXPIRED_BUY_ORDER
+}
+
+enum MarketClaimStatus {
+  PENDING
+  CLAIMED
+}
+
+enum TradeOfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+  EXPIRED
+  INVALIDATED
+}
+
+enum TradeOfferSide {
+  OFFERED
+  REQUESTED
+}
+
+enum GuildUpgradeType {
+  HERO_SLOTS
+  MARKET_SLOTS
+  TRADE_SLOTS
+  STORAGE
+}
+
+enum EconomyEventType {
+  EXPEDITION_REWARD
+  HERO_RECRUITMENT
+  MARKET_LISTING_FEE
+  MARKET_SALE
+  MARKET_CLAIM
+  BUY_ORDER_POSTED
+  BUY_ORDER_FILLED
+  BUY_ORDER_CLAIM
+  TRADE_COMPLETED
+  GUILD_UPGRADE_PURCHASE
+  WORKSHOP_UPGRADE
+  CONTRACT_REWARD
+  WORLD_EVENT_REWARD
+  SEED
+}
+
+enum ReferenceType {
+  SYSTEM
+  GUILD
+  EXPEDITION
+  MARKET_LISTING
+  MARKET_CLAIM
+  BUY_ORDER
+  TRADE_OFFER
+  GUILD_UPGRADE
+}
+
+enum AuditSourceType {
+  SYSTEM
+  MARKET
+  TRADE
+}
+
+enum AuditFlagType {
+  PRICE_OUTLIER
+  REPEATED_COUNTERPARTY
+  STARTER_TRANSFER
+  MANUAL_REVIEW
+}
+
+enum AuditSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model User {
+  id          String     @id @default(cuid())
+  email       String     @unique
+  displayName String
+  passwordHash String?
+  status      UserStatus @default(ACTIVE)
+  createdAt   DateTime   @default(now())
+  lastSeenAt  DateTime?
+  guild       Guild?
+  authSessions AuthSession[]
+}
+
+model AuthSession {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model Guild {
+  id                     String               @id @default(cuid())
+  userId                 String               @unique
+  name                   String
+  tag                    String               @unique
+  level                  Int                  @default(1)
+  xp                     Int                  @default(0)
+  gold                   Int                  @default(0)
+  marketUnlockedAt       DateTime?
+  tradeUnlockedAt        DateTime?
+  marketSlotsBase        Int                  @default(1)
+  activeHeroSlots        Int                  @default(3)
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  user                   User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  heroes                 Hero[]
+  inventoryItems         InventoryItem[]
+  resourceBalances       ResourceBalance[]
+  expeditions            Expedition[]
+  marketListingsAsSeller MarketListing[]      @relation("MarketSeller")
+  marketListingsAsBuyer  MarketListing[]      @relation("MarketBuyer")
+  buyOrdersAsBuyer       BuyOrder[]           @relation("BuyOrderBuyer")
+  buyOrdersAsFulfiller   BuyOrder[]           @relation("BuyOrderFulfiller")
+  marketClaims           MarketClaim[]
+  tradeOffersSent        TradeOffer[]         @relation("TradeOfferSender")
+  tradeOffersReceived    TradeOffer[]         @relation("TradeOfferReceiver")
+  guildUpgrades          GuildUpgrade[]
+  economyLedgerEntries   EconomyLedgerEntry[]
+  auditFlags             AuditFlag[]          @relation("AuditFlagGuild")
+  relatedAuditFlags      AuditFlag[]          @relation("AuditFlagRelatedGuild")
+}
+
+model Hero {
+  id                String               @id @default(cuid())
+  guildId           String
+  name              String
+  heroClass         HeroClass
+  level             Int                  @default(1)
+  heroXp            Int                  @default(0)
+  rarity            HeroRarity           @default(COMMON)
+  status            HeroStatus           @default(AVAILABLE)
+  powerScore        Int                  @default(0)
+  createdAt         DateTime             @default(now())
+  guild             Guild                @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  equippedItems     InventoryItem[]      @relation("HeroEquipment")
+  expeditionParties ExpeditionPartyHero[]
+
+  @@index([guildId, status])
+}
+
+model ItemDefinition {
+  id                String             @id @default(cuid())
+  code              String             @unique
+  name              String
+  itemType          ItemType
+  rarity            ItemRarity         @default(COMMON)
+  equipSlot         EquipmentSlot?
+  powerScore        Int                @default(0)
+  requiredGuildLevel Int               @default(1)
+  isTradable        Boolean            @default(true)
+  isStarterLocked   Boolean            @default(false)
+  vendorBasePrice   Int?
+  inventoryItems    InventoryItem[]
+  lootTableEntries  LootTableEntry[]
+  expeditionRewards ExpeditionReward[]
+  marketListings    MarketListing[]
+}
+
+model InventoryItem {
+  id                   String               @id @default(cuid())
+  guildId              String
+  itemDefinitionId     String
+  state                InventoryItemState   @default(AVAILABLE)
+  boundToGuild         Boolean              @default(false)
+  workshopLevel        Int                  @default(0)
+  equippedHeroId       String?
+  reservedByType       ReservationType?
+  reservedById         String?
+  acquiredAt           DateTime             @default(now())
+  guild                Guild                @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  itemDefinition       ItemDefinition       @relation(fields: [itemDefinitionId], references: [id])
+  equippedHero         Hero?                @relation("HeroEquipment", fields: [equippedHeroId], references: [id], onDelete: SetNull)
+  marketClaims         MarketClaim[]
+  marketListings       MarketListing[]
+  tradeOfferItems      TradeOfferItem[]
+  economyLedgerEntries EconomyLedgerEntry[]
+
+  @@index([guildId, state])
+  @@index([equippedHeroId])
+}
+
+model ResourceBalance {
+  id           String       @id @default(cuid())
+  guildId      String
+  resourceType ResourceType
+  amount       Int          @default(0)
+  guild        Guild        @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, resourceType])
+}
+
+model Location {
+  id                 String          @id @default(cuid())
+  code               String          @unique
+  name               String
+  requiredGuildLevel Int             @default(1)
+  durationSeconds    Int
+  recommendedPower   Int
+  isEnabled          Boolean         @default(true)
+  lootTableEntries   LootTableEntry[]
+  expeditions        Expedition[]
+}
+
+model LootTableEntry {
+  id               String         @id @default(cuid())
+  locationId       String
+  rewardType       RewardType
+  itemDefinitionId String?
+  resourceType     ResourceType?
+  quantityMin      Int            @default(1)
+  quantityMax      Int            @default(1)
+  dropWeight       Int            @default(1)
+  location         Location       @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  itemDefinition   ItemDefinition? @relation(fields: [itemDefinitionId], references: [id])
+
+  @@index([locationId, rewardType])
+}
+
+model Expedition {
+  id            String            @id @default(cuid())
+  guildId       String
+  locationId    String
+  status        ExpeditionStatus  @default(ACTIVE)
+  resultTier    ExpeditionResultTier?
+  startedAt     DateTime          @default(now())
+  endsAt        DateTime
+  resolvedAt    DateTime?
+  claimedAt     DateTime?
+  resultSummary String?
+  combatLog     String?
+  rewardGold    Int               @default(0)
+  rewardGuildXp Int               @default(0)
+  partyPowerSnapshot Int          @default(0)
+  threatScoreSnapshot Int         @default(0)
+  guild         Guild             @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  location      Location          @relation(fields: [locationId], references: [id])
+  party         ExpeditionPartyHero[]
+  rewards       ExpeditionReward[]
+
+  @@index([guildId, status])
+}
+
+model ExpeditionPartyHero {
+  id           String     @id @default(cuid())
+  expeditionId String
+  heroId       String
+  expedition   Expedition @relation(fields: [expeditionId], references: [id], onDelete: Cascade)
+  hero         Hero       @relation(fields: [heroId], references: [id], onDelete: Cascade)
+
+  @@unique([expeditionId, heroId])
+}
+
+model ExpeditionReward {
+  id               String         @id @default(cuid())
+  expeditionId     String
+  rewardType       RewardType
+  itemDefinitionId String?
+  resourceType     ResourceType?
+  quantity         Int            @default(1)
+  createdAt        DateTime       @default(now())
+  expedition       Expedition     @relation(fields: [expeditionId], references: [id], onDelete: Cascade)
+  itemDefinition   ItemDefinition? @relation(fields: [itemDefinitionId], references: [id])
+
+  @@index([expeditionId, rewardType])
+}
+
+model MarketListing {
+  id               String              @id @default(cuid())
+  sellerGuildId    String
+  buyerGuildId     String?
+  listingType      ListingType
+  inventoryItemId  String?
+  itemDefinitionId String?
+  resourceType     ResourceType?
+  quantity         Int                 @default(1)
+  totalPriceGold   Int
+  listingFeeGold   Int
+  saleTaxGold      Int?
+  status           MarketListingStatus @default(ACTIVE)
+  createdAt        DateTime            @default(now())
+  expiresAt        DateTime
+  soldAt           DateTime?
+  sellerGuild      Guild               @relation("MarketSeller", fields: [sellerGuildId], references: [id], onDelete: Cascade)
+  buyerGuild       Guild?              @relation("MarketBuyer", fields: [buyerGuildId], references: [id])
+  inventoryItem    InventoryItem?      @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  itemDefinition   ItemDefinition?     @relation(fields: [itemDefinitionId], references: [id])
+  claims           MarketClaim[]
+
+  @@index([sellerGuildId, status])
+  @@index([status, expiresAt])
+}
+
+model BuyOrder {
+  id               String         @id @default(cuid())
+  buyerGuildId     String
+  fulfillerGuildId String?
+  resourceType     ResourceType
+  quantity         Int            @default(1)
+  totalPriceGold   Int
+  status           BuyOrderStatus @default(ACTIVE)
+  createdAt        DateTime       @default(now())
+  expiresAt        DateTime
+  fulfilledAt      DateTime?
+  buyerGuild       Guild          @relation("BuyOrderBuyer", fields: [buyerGuildId], references: [id], onDelete: Cascade)
+  fulfillerGuild   Guild?         @relation("BuyOrderFulfiller", fields: [fulfillerGuildId], references: [id])
+  claims           MarketClaim[]
+
+  @@index([buyerGuildId, status])
+  @@index([status, expiresAt])
+}
+
+model MarketClaim {
+  id              String                @id @default(cuid())
+  guildId         String
+  listingId       String?
+  buyOrderId      String?
+  sourceType      MarketClaimSourceType
+  claimType       MarketClaimType
+  inventoryItemId String?
+  resourceType    ResourceType?
+  goldAmount      Int?
+  quantity        Int                   @default(1)
+  status          MarketClaimStatus     @default(PENDING)
+  createdAt       DateTime              @default(now())
+  claimedAt       DateTime?
+  guild           Guild                 @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  listing         MarketListing?        @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  buyOrder        BuyOrder?             @relation(fields: [buyOrderId], references: [id], onDelete: SetNull)
+  inventoryItem   InventoryItem?        @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+
+  @@index([guildId, status])
+  @@index([buyOrderId])
+}
+
+model TradeOffer {
+  id              String            @id @default(cuid())
+  senderGuildId   String
+  receiverGuildId String
+  status          TradeOfferStatus  @default(PENDING)
+  message         String?
+  expiresAt       DateTime
+  createdAt       DateTime          @default(now())
+  respondedAt     DateTime?
+  senderGuild     Guild             @relation("TradeOfferSender", fields: [senderGuildId], references: [id], onDelete: Cascade)
+  receiverGuild   Guild             @relation("TradeOfferReceiver", fields: [receiverGuildId], references: [id], onDelete: Cascade)
+  items           TradeOfferItem[]
+
+  @@index([senderGuildId, status])
+  @@index([receiverGuildId, status])
+}
+
+model TradeOfferItem {
+  id              String         @id @default(cuid())
+  tradeOfferId    String
+  side            TradeOfferSide
+  inventoryItemId String?
+  resourceType    ResourceType?
+  quantity        Int            @default(1)
+  tradeOffer      TradeOffer     @relation(fields: [tradeOfferId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+}
+
+model GuildUpgrade {
+  id          String           @id @default(cuid())
+  guildId     String
+  upgradeType GuildUpgradeType
+  level       Int              @default(1)
+  purchasedAt DateTime         @default(now())
+  guild       Guild            @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, upgradeType])
+}
+
+model EconomyLedgerEntry {
+  id                 String           @id @default(cuid())
+  guildId            String
+  eventType          EconomyEventType
+  referenceType      ReferenceType
+  referenceId        String
+  goldDelta          Int              @default(0)
+  resourceType       ResourceType?
+  resourceDelta      Int?
+  inventoryItemId    String?
+  counterpartyGuildId String?
+  isSuspicious       Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  guild              Guild            @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  inventoryItem      InventoryItem?   @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+
+  @@index([guildId, createdAt])
+}
+
+model AuditFlag {
+  id             String          @id @default(cuid())
+  guildId        String?
+  relatedGuildId String?
+  sourceType     AuditSourceType
+  sourceId       String
+  flagType       AuditFlagType
+  severity       AuditSeverity   @default(LOW)
+  note           String
+  createdAt      DateTime        @default(now())
+  guild          Guild?          @relation("AuditFlagGuild", fields: [guildId], references: [id], onDelete: SetNull)
+  relatedGuild   Guild?          @relation("AuditFlagRelatedGuild", fields: [relatedGuildId], references: [id], onDelete: SetNull)
+
+  @@index([sourceType, sourceId])
+}

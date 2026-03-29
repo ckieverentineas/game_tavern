@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Guild Exchange — local alpha + demo sandbox
 
-## Getting Started
+Локальный прототип браузерной idle/management RPG на Next.js + TypeScript + Prisma + SQLite.
 
-First, run the development server:
+## Быстрый старт
+
+1. Подготовьте SQLite и seed:
+
+```bash
+npm run db:setup
+```
+
+2. Запустите dev-сервер:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+3. Откройте [`http://localhost:3000`](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Local alpha account + demo sandbox
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- После [`npm run db:setup`](package.json:17) доступны оба режима:
+  - **local alpha account** — зарегистрируйте аккаунт на главной странице, сразу получите стартовую гильдию и войдёте в личный user/guild context
+  - **demo sandbox** — без входа или через shell переключитесь в seeded `Dawn Ledger [DEMO]` / `Ashen Union [RIVL]` и используйте multi-guild switcher для локальной отладки
+- Signup flow сразу создаёт:
+  - пользователя с email + password
+  - cookie-based session
+  - стартовую гильдию с открытыми market/trade каналами
+  - базовый ростер героев, стартовые предметы, ресурсы и workshop tier 1
+- В любом режиме после setup можно проверить полный минимальный loop:
+  - отправить героев в экспедицию
+  - дождаться lazy resolution и забрать награды
+  - экипировать предметы на героев и снять их обратно
+  - выставить item/resource лот на рынок, купить чужой лот, отменить свой и забрать claim
+  - создать приватную barter-сделку, принять её, отклонить или отменить
+  - купить guild upgrade на дополнительные слоты и progression unlock-и
+  - открыть `/guilds`, сравнить public leaderboards, перейти в публичный профиль гильдии и затем мягко провалиться в `/market?guild=TAG` или `/deals?to=TAG`
 
-## Learn More
+## Social directory / public profile flow
 
-To learn more about Next.js, take a look at the following resources:
+- Новый social discovery layer живёт в `/guilds` и `/guilds/[guildTag]`
+- `/guilds` показывает:
+  - публичный каталог гильдий
+  - каталог игроков по owner/display name
+  - лидерборды по guild level, wealth, roster power и market activity
+  - seasonal world event board с общими целями, standings и claimable rewards
+- `/guilds/[guildTag]` показывает полезный public profile:
+  - гильдию, tag, owner/display name
+  - progression snapshot, power, wealth, PvE status и часть ростера
+  - live market / buy-order витрину и recent public activity
+  - seasonal status по событиям frontier / market / forge
+  - social CTA в `/market?guild=TAG` и `/deals?to=TAG`
+- Dashboard, `/expedition` и `/market` теперь отдельно объясняют, как текущие действия двигают world events и какие rewards уже можно забрать.
+- Seed теперь поднимает не только managed demo-гильдии для sandbox switching, но и дополнительные публичные seasonal claims, чтобы directory, event standings и leaderboard-слой выглядели живыми сразу после [`npm run db:setup`](package.json:19)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Проверки
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Для базовой проверки проекта доступны команды:
 
-## Deploy on Vercel
+```bash
+npm run check
+npm run build
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Примечание по Prisma config
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+В проекте используется [`prisma.config.ts`](prisma.config.ts), поэтому CLI не подхватывает `.env` автоматически. Если `DATABASE_URL` не задана явно, конфиг использует fallback `file:./dev.db`, чтобы [`npm run db:setup`](package.json:17) работал сразу в локальном MVP-сценарии.

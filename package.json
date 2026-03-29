@@ -1,14 +1,25 @@
 {
-  "name": "temp-foundation",
+  "name": "guild-exchange-foundation",
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "postinstall": "prisma generate",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run lint && npm run typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio",
+    "db:setup": "npm run db:generate && npm run db:push && npm run db:seed"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.2",
     "next": "16.2.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"
@@ -20,6 +31,9 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.0",
-    "typescript": "^5"
+    "prisma": "^6.19.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }
