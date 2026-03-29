@@ -1,19 +1,23 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { GuildWatchToggle } from "@/components/guild-watch-toggle";
 import { EmptyState, InfoCard, Notice, PageHeader, Pill, SectionCard } from "@/components/ui";
-import { formatDateTime, formatNumber } from "@/lib/format";
+import { type PageSearchParams, formatDateTime, formatNumber, readActionFeedback } from "@/lib/format";
 import { claimWorldEventReward } from "@/server/actions/foundation";
 import { getGuildPublicProfilePageData } from "@/server/game";
 
 export default async function GuildPublicProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ guildTag: string }>;
+  searchParams: PageSearchParams;
 }) {
   await connection();
-  const { guildTag } = await params;
+  const [{ guildTag }, queryParams] = await Promise.all([params, searchParams]);
   const snapshot = await getGuildPublicProfilePageData(guildTag);
+  const feedback = readActionFeedback(queryParams);
 
   if (!snapshot.ok) {
     return (
@@ -43,6 +47,15 @@ export default async function GuildPublicProfilePage({
             <Link className="button button--primary" href={data.socialCtas.marketHref}>
               Смотреть market context
             </Link>
+            {!data.guild.isCurrentContext ? (
+              <GuildWatchToggle
+                guildTag={data.guild.tag}
+                isWatched={data.isWatched}
+                redirectTo={`/guilds/${encodeURIComponent(data.guild.tag)}`}
+                followLabel="Добавить в watchlist"
+                unfollowLabel="Убрать из watchlist"
+              />
+            ) : null}
             <Link className="button button--ghost" href={data.socialCtas.dealsHref}>
               Private deal CTA
             </Link>
@@ -53,11 +66,21 @@ export default async function GuildPublicProfilePage({
         }
       />
 
+      {feedback ? <Notice tone={feedback.tone}>{feedback.message}</Notice> : null}
+
       <Notice tone={data.guild.isCurrentContext ? "success" : "accent"}>
         {data.guild.isCurrentContext
           ? "Это публичная версия вашей текущей гильдии: теперь её статус, reputation и social visibility читаются так же, как у остальных."
           : `Гильдия ${data.guild.name} [${data.guild.tag}] видна публично и теперь сразу объясняет, почему она статусна как контрагент, supplier или frontier-имя.`}
       </Notice>
+
+      {!data.guild.isCurrentContext ? (
+        <Notice tone={data.isWatched ? "success" : "accent"}>
+          <strong>{data.watchlist.storageLabel}.</strong> {data.isWatched
+            ? `${data.guild.name} [${data.guild.tag}] уже в вашем watchlist и будет появляться в персональной social activity ленте на dashboard.`
+            : `${data.guild.name} [${data.guild.tag}] ещё не отслеживается. Добавьте дом в watchlist, чтобы возвращаться за его market, deal, contract и frontier activity.`}
+        </Notice>
+      ) : null}
 
       <Notice tone={data.prestige.tone}>
         <strong>{data.prestige.tierLabel}.</strong> {data.prestige.spotlight}
@@ -84,6 +107,16 @@ export default async function GuildPublicProfilePage({
           value={`${data.prestige.score}`}
           detail={`#${data.prestige.rank} из ${data.prestige.total} · ${data.prestige.recentTrustLabel}`}
           tone={data.prestige.tone}
+        />
+        <InfoCard
+          title="Watchlist"
+          value={data.isWatched ? "Watching" : `${data.watchlist.count}/${data.watchlist.maxCount}`}
+          detail={data.guild.isCurrentContext
+            ? "Текущую гильдию нельзя подписать на саму себя."
+            : data.isWatched
+              ? `${data.guild.tag} уже в вашем retention watchlist.`
+              : "Добавьте дом в watchlist, чтобы видеть его действия в персональной follow-ленте."}
+          tone={data.isWatched ? "success" : "accent"}
         />
         <InfoCard
           title="Guild level"

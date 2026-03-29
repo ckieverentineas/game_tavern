@@ -1,14 +1,20 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { GuildWatchToggle } from "@/components/guild-watch-toggle";
 import { InfoCard, Notice, PageHeader, Pill, SectionCard } from "@/components/ui";
-import { formatDateTime, formatNumber } from "@/lib/format";
+import { type PageSearchParams, formatDateTime, formatNumber, readActionFeedback } from "@/lib/format";
 import { claimWorldEventReward } from "@/server/actions/foundation";
 import { getGuildDirectoryPageData } from "@/server/game";
 
-export default async function GuildDirectoryPage() {
+export default async function GuildDirectoryPage({
+  searchParams,
+}: {
+  searchParams: PageSearchParams;
+}) {
   await connection();
-  const snapshot = await getGuildDirectoryPageData();
+  const [params, snapshot] = await Promise.all([searchParams, getGuildDirectoryPageData()]);
+  const feedback = readActionFeedback(params);
 
   if (!snapshot.ok) {
     return (
@@ -45,8 +51,14 @@ export default async function GuildDirectoryPage() {
         }
       />
 
+      {feedback ? <Notice tone={feedback.tone}>{feedback.message}</Notice> : null}
+
       <Notice tone="accent">
         Renown и social memory собираются поверх уже существующих market sales, fulfilled buy orders, accepted deals, контрактов и PvE: без тяжёлого нового backend-а, но с понятной social visibility и причинами возвращаться не в пустой рынок, а к знакомым домам.
+      </Notice>
+
+      <Notice tone={data.watchlist.count > 0 ? (data.watchlist.isAutoSeeded ? "success" : "accent") : "neutral"}>
+        <strong>{data.watchlist.storageLabel}.</strong> {data.watchlist.summary} {data.watchlist.helperText}
       </Notice>
 
       <Notice tone="success">
@@ -137,6 +149,62 @@ export default async function GuildDirectoryPage() {
         </div>
       </SectionCard>
 
+      <SectionCard
+        title="Watchlist / follow layer"
+        description={data.watchlist.summary}
+        aside={<Pill tone={data.watchlist.count > 0 ? "accent" : "neutral"}>{`${data.watchlist.count}/${data.watchlist.maxCount}`}</Pill>}
+      >
+        <div className="stack-sm">
+          {data.followedGuilds.length > 0 ? (
+            data.followedGuilds.map((guild) => (
+              <article key={`followed-${guild.guildId}`} className="row-card">
+                <div>
+                  <div className="row-card__title">
+                    {guild.guildName} [{guild.guildTag}]
+                  </div>
+                  <p className="row-card__description">
+                    {guild.watchReasonLabel}
+                    <br />
+                    {guild.watchReasonDetail}
+                  </p>
+                </div>
+                <div className="row-card__aside">
+                  <Pill tone={guild.renown.tone}>{guild.renown.tierLabel}</Pill>
+                  <GuildWatchToggle guildTag={guild.guildTag} isWatched={true} redirectTo="/guilds" />
+                  <Link className="button button--ghost" href={guild.profileHref}>
+                    Профиль
+                  </Link>
+                </div>
+              </article>
+            ))
+          ) : null}
+
+          {data.suggestedGuilds.length > 0 ? (
+            <div className="stack-sm">
+              <div className="row-card__title">Suggested guilds to watch</div>
+              {data.suggestedGuilds.map((guild) => (
+                <article key={`watch-suggestion-${guild.guildId}`} className="row-card">
+                  <div>
+                    <div className="row-card__title">
+                      {guild.guildName} [{guild.guildTag}]
+                    </div>
+                    <p className="row-card__description">
+                      {guild.watchReasonLabel}
+                      <br />
+                      {guild.watchReasonDetail}
+                    </p>
+                  </div>
+                  <div className="row-card__aside">
+                    <Pill tone={guild.renown.tone}>{guild.renown.tierLabel}</Pill>
+                    <GuildWatchToggle guildTag={guild.guildTag} isWatched={false} redirectTo="/guilds" />
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </SectionCard>
+
       <div className="content-grid content-grid--two-thirds">
         {data.leaderboards.map((leaderboard) => (
           <SectionCard
@@ -223,9 +291,13 @@ export default async function GuildDirectoryPage() {
                 {guild.renown.primaryPerkLabel ? <Pill tone="success">{guild.renown.primaryPerkLabel}</Pill> : null}
                 <Pill tone={guild.prestige.tone}>{guild.prestige.tierLabel}</Pill>
                 {guild.prestige.primaryBadgeLabel ? <Pill tone="accent">{guild.prestige.primaryBadgeLabel}</Pill> : null}
+                {guild.isWatched ? <Pill tone="success">В watchlist</Pill> : null}
                 <Pill tone={guild.isCurrentContext ? "success" : "accent"}>
                   {guild.isCurrentContext ? "Текущая гильдия" : "Публична"}
                 </Pill>
+                {!guild.isCurrentContext ? (
+                  <GuildWatchToggle guildTag={guild.guildTag} isWatched={guild.isWatched} redirectTo="/guilds" />
+                ) : null}
                 <Link className="button button--primary" href={guild.profileHref}>
                   Профиль
                 </Link>

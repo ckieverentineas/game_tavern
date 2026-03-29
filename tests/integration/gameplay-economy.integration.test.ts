@@ -36,6 +36,7 @@ import {
   upgradeInventoryItemForDemoGuild,
 } from "@/server/game";
 import { setActiveDemoGuildTag, setActivePlayContext } from "@/server/foundation";
+import { followGuildForCurrentContext, unfollowGuildForCurrentContext } from "@/server/social";
 import { disconnectTestDatabase, resetTestDatabase } from "../helpers/test-db";
 import { unwrapFoundationResult } from "../helpers/result";
 import { resetMockCookies } from "../mocks/next-headers";
@@ -340,9 +341,13 @@ describe("gameplay/economy integration", () => {
     expect(forgeDrive?.rewardTiers.find((tier) => tier.key === "bronze")?.status).toBe("claimed");
     expect(forgeDrive?.rewardTiers.some((tier) => tier.status === "claimable")).toBe(true);
 
+    const followResult = await followGuildForCurrentContext("RIVL");
+    expect(followResult.guildTag).toBe("RIVL");
+
     const marketPage = unwrapFoundationResult(await getMarketPageData());
     const dealsPage = unwrapFoundationResult(await getDealsPageData());
     const directoryPage = unwrapFoundationResult(await getGuildDirectoryPageData());
+    const dashboardWithWatchlist = unwrapFoundationResult(await getDashboardPageData());
     const profilePage = unwrapFoundationResult(await getGuildPublicProfilePageData("DEMO"));
     expect(marketPage.ruleSummary.length).toBeGreaterThan(0);
     expect(dealsPage.ruleSummary.length).toBeGreaterThan(0);
@@ -357,11 +362,20 @@ describe("gameplay/economy integration", () => {
     expect(directoryPage.worldEventBoard.events).toHaveLength(3);
     expect(directoryPage.guilds.some((guild) => guild.prestige.badges.length > 0)).toBe(true);
     expect(directoryPage.guilds.some((guild) => guild.favoriteCounterparties.length > 0)).toBe(true);
+    expect(directoryPage.watchlist.watchedGuildTags).toContain("RIVL");
+    expect(directoryPage.guilds.find((guild) => guild.guildTag === "RIVL")?.isWatched).toBe(true);
+    expect(dashboardWithWatchlist.watchlist.watchedGuildTags).toContain("RIVL");
+    expect(dashboardWithWatchlist.followedGuilds.some((guild) => guild.guildTag === "RIVL")).toBe(true);
+    expect(dashboardWithWatchlist.personalizedFeed.entries.some((entry) => entry.guildTag === "RIVL")).toBe(true);
     expect(profilePage.prestige.rankingContributions.length).toBe(5);
     expect(profilePage.renown.rankingContributions.length).toBe(4);
     expect(profilePage.favoriteTraders.length).toBeGreaterThan(0);
     expect(profilePage.socialMemory.length).toBeGreaterThan(0);
     expect(profilePage.recentActivity.length).toBeGreaterThan(0);
     expect(profilePage.worldEventBoard.events.some((event) => event.focusGuild?.guildTag === "DEMO")).toBe(true);
+
+    await unfollowGuildForCurrentContext("RIVL");
+    const dashboardWithoutWatchlist = unwrapFoundationResult(await getDashboardPageData());
+    expect(dashboardWithoutWatchlist.watchlist.watchedGuildTags).not.toContain("RIVL");
   });
 });

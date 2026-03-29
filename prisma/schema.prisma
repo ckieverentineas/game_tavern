@@ -206,6 +206,7 @@ model User {
   createdAt   DateTime   @default(now())
   lastSeenAt  DateTime?
   guild       Guild?
+  guildWatchlistEntries GuildWatchlistEntry[]
   authSessions AuthSession[]
 }
 
@@ -251,6 +252,20 @@ model Guild {
   economyLedgerEntries   EconomyLedgerEntry[]
   auditFlags             AuditFlag[]          @relation("AuditFlagGuild")
   relatedAuditFlags      AuditFlag[]          @relation("AuditFlagRelatedGuild")
+  watchlistEntries       GuildWatchlistEntry[]
+}
+
+model GuildWatchlistEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  guildId   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, guildId])
+  @@index([userId, createdAt])
+  @@index([guildId])
 }
 
 model Hero {

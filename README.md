@@ -44,6 +44,7 @@ npm run dev
   - публичный каталог гильдий
   - каталог игроков по owner/display name
   - renown-aware сортировку с recurring links, favorite traders и familiar-house highlight-ами
+  - follow/watchlist controls для быстрого добавления интересных домов
   - лидерборды по guild level, wealth, roster power и market activity
   - seasonal world event board с общими целями, standings и claimable rewards
 - `/guilds/[guildTag]` показывает полезный public profile:
@@ -53,8 +54,9 @@ npm run dev
   - live market / buy-order витрину и recent public activity
   - seasonal status по событиям frontier / market / forge
   - social CTA в `/market?guild=TAG` и `/deals?to=TAG`
+- Dashboard теперь получает персональный follow feed: после добавления домов в watchlist в ленту собираются их market sales, buy-order fulfills, accepted deals, contract claims, workshop / guild upgrade spikes и high-risk clears.
+- В account-режиме watchlist хранится за пользователем, а в demo sandbox живёт отдельно в cookie; если demo-watchlist ещё не настроен, seed social memory автоматически подсказывает несколько знакомых домов, чтобы feed не был пустым сразу после [`npm run db:setup`](package.json:19).
 - Dashboard, `/market` и `/deals` теперь отдельно подсвечивают favorite traders, recurring ties и preferred-trader callout-ы как мягкий retention hook.
-- Seed теперь поднимает не только managed demo-гильдии для sandbox switching, но и разные renown states, favorite traders и social history между несколькими домами, чтобы directory, event standings и social memory-слой выглядели живыми сразу после [`npm run db:setup`](package.json:19)
 
 ## Проверки
 

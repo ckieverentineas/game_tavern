@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { GuildWatchToggle } from "@/components/guild-watch-toggle";
 import { EmptyState, InfoCard, Notice, PageHeader, Pill, SectionCard } from "@/components/ui";
 import { FOUNDATION_ACTIONS } from "@/lib/domain";
 import {
@@ -138,6 +139,10 @@ export default async function DashboardPage({
       <Notice tone="accent">
         <strong>{worldEventBoard.season.label}.</strong> {worldEventBoard.season.summary} Сейчас видно
         {` ${worldEventBoard.summary.claimableRewardCount} готовых reward-claim, ${worldEventBoard.summary.nearGoalCount} близких tier-целей и ${worldEventBoard.summary.recentActivityCount} публичных сигналов активности.`}
+      </Notice>
+
+      <Notice tone={data.watchlist.count > 0 ? (data.watchlist.isAutoSeeded ? "success" : "accent") : "neutral"}>
+        <strong>{data.watchlist.storageLabel}.</strong> {data.watchlist.summary} {data.watchlist.helperText}
       </Notice>
 
       {shellContext.mode === "demo" ? (
@@ -566,6 +571,76 @@ export default async function DashboardPage({
         </div>
       </SectionCard>
 
+      <SectionCard
+        title="Guild watchlist"
+        description={data.watchlist.summary}
+        aside={<Pill tone={data.watchlist.count > 0 ? "accent" : "neutral"}>{`${data.watchlist.count}/${data.watchlist.maxCount}`}</Pill>}
+      >
+        <div className="stack-sm">
+          {data.followedGuilds.length > 0 ? (
+            data.followedGuilds.map((guild) => (
+              <article key={`watch-${guild.guildId}`} className="row-card">
+                <div>
+                  <div className="row-card__title">
+                    {guild.guildName} [{guild.guildTag}]
+                  </div>
+                  <p className="row-card__description">
+                    {guild.watchReasonLabel} · {guild.watchReasonDetail}
+                    <br />
+                    {guild.renown.tierLabel} · {guild.renown.score} renown · {guild.prestige.tierLabel}
+                    <br />
+                    {guild.socialSummary}
+                  </p>
+                </div>
+                <div className="row-card__aside">
+                  <Pill tone={guild.renown.tone}>{guild.renown.tierLabel}</Pill>
+                  <Pill tone={guild.prestige.tone}>{guild.prestige.tierLabel}</Pill>
+                  <GuildWatchToggle
+                    guildTag={guild.guildTag}
+                    isWatched={guild.isWatched}
+                    redirectTo="/dashboard"
+                    followLabel="Следить"
+                    unfollowLabel="Unfollow"
+                  />
+                  <Link className="button button--ghost" href={guild.profileHref}>
+                    Профиль
+                  </Link>
+                </div>
+              </article>
+            ))
+          ) : (
+            <EmptyState
+              title="Watchlist ещё не собран"
+              description="Добавьте несколько интересных домов, чтобы dashboard начал собирать для вас персональную social activity ленту."
+            />
+          )}
+
+          {data.suggestedGuilds.length > 0 ? (
+            <div className="stack-sm">
+              <div className="row-card__title">Suggested guilds to watch</div>
+              {data.suggestedGuilds.map((guild) => (
+                <article key={`suggested-${guild.guildId}`} className="row-card">
+                  <div>
+                    <div className="row-card__title">
+                      {guild.guildName} [{guild.guildTag}]
+                    </div>
+                    <p className="row-card__description">
+                      {guild.watchReasonLabel}
+                      <br />
+                      {guild.watchReasonDetail}
+                    </p>
+                  </div>
+                  <div className="row-card__aside">
+                    <Pill tone={guild.renown.tone}>{guild.renown.tierLabel}</Pill>
+                    <GuildWatchToggle guildTag={guild.guildTag} isWatched={false} redirectTo="/dashboard" />
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </SectionCard>
+
       <div className="content-grid content-grid--two-thirds">
         <SectionCard
           title="Unified inbox"
@@ -615,16 +690,18 @@ export default async function DashboardPage({
         </SectionCard>
 
         <SectionCard
-          title="Recent social activity"
-          description="Прозрачная recent history по sell listings, request board и приватным сделкам вместо чёрного ящика статусов."
-          aside={<Pill tone={data.inbox.recent.length > 0 ? "accent" : "neutral"}>{data.inbox.recent.length} recent</Pill>}
+          title="Follow feed"
+          description={data.personalizedFeed.summary}
+          aside={<Pill tone={data.personalizedFeed.entries.length > 0 ? "accent" : "neutral"}>{data.personalizedFeed.entries.length} feed</Pill>}
         >
-          {data.inbox.recent.length > 0 ? (
+          {data.personalizedFeed.entries.length > 0 ? (
             <div className="stack-sm">
-              {data.inbox.recent.map((entry) => (
+              {data.personalizedFeed.entries.map((entry) => (
                 <article key={entry.id} className="row-card">
                   <div>
-                    <div className="row-card__title">{entry.title}</div>
+                    <div className="row-card__title">
+                      {entry.guildTag} · {entry.title}
+                    </div>
                     <p className="row-card__description">
                       {entry.summary}
                       <br />
@@ -632,12 +709,13 @@ export default async function DashboardPage({
                     </p>
                   </div>
                   <div className="row-card__aside">
-                    <Pill tone={entry.tone}>
-                      {entry.source === "market" ? "Market" : entry.source === "trade" ? "Deals" : "Seasonal board"}
-                    </Pill>
-                    <span className="muted">{formatDateTime(entry.createdAt)}</span>
+                    <Pill tone={entry.tone}>{entry.sourceLabel}</Pill>
+                    <span className="muted">{formatDateTime(entry.at)}</span>
+                    <Link className="button button--ghost" href={entry.profileHref}>
+                      Профиль дома
+                    </Link>
                     <Link className="button button--ghost" href={entry.href}>
-                      Открыть ленту
+                      Открыть контекст
                     </Link>
                   </div>
                 </article>
@@ -645,8 +723,8 @@ export default async function DashboardPage({
             </div>
           ) : (
             <EmptyState
-              title="История ещё не собралась"
-              description="После первых market / request / trade outcomes здесь появится понятная временная шкала recent activity."
+              title="Follow feed пока пуст"
+              description="Как только отслеживаемые дома начнут продавать, закрывать спрос, подтверждать deals, забирать contracts или делать high-risk clears, activity появится здесь."
             />
           )}
         </SectionCard>

@@ -23,6 +23,16 @@ type KnownError = {
 
 const ACTIVE_DEMO_GUILD_COOKIE = "guild-exchange-active-guild";
 const ACTIVE_PLAY_CONTEXT_COOKIE = "guild-exchange-active-context";
+const GUILD_WATCHLIST_COOKIE = "guild-exchange-watchlist";
+const GUILD_WATCHLIST_EMPTY_SENTINEL = "__empty__";
+
+export type WatchlistStorageMode = "account" | "demo";
+
+export type PersistedWatchlistState = {
+  storageMode: WatchlistStorageMode;
+  guildTags: string[];
+  configured: boolean;
+};
 
 const demoGuildIdentitySelect = {
   id: true,
@@ -108,6 +118,18 @@ export type AppShellContext = {
   demoContext: DemoShellContext;
 };
 
+function normalizeGuildTag(value: string) {
+  return value.trim().toUpperCase();
+}
+
+function sanitizeWatchlistGuildTags(guildTags: string[]) {
+  return [...new Set(
+    guildTags
+      .map((guildTag) => normalizeGuildTag(guildTag))
+      .filter((guildTag) => /^[A-Z0-9-]{2,12}$/i.test(guildTag)),
+  )];
+}
+
 function mapDemoGuildIdentity(guild: DemoGuildIdentityRecord): DemoGuildIdentity {
   return {
     ...guild,
@@ -177,6 +199,23 @@ async function readRequestedActivePlayContext(hasAuthenticatedGuild: boolean) {
   }
 
   return hasAuthenticatedGuild ? ("user" as const) : ("demo" as const);
+}
+
+async function resolveWatchlistStorageContext() {
+  const viewer = await getCurrentSessionViewer();
+  const requestedContext = await readRequestedActivePlayContext(Boolean(viewer?.guild));
+
+  if (viewer?.guild && requestedContext === "user") {
+    return {
+      storageMode: "account" as const,
+      viewerId: viewer.id,
+    };
+  }
+
+  return {
+    storageMode: "demo" as const,
+    viewerId: null,
+  };
 }
 
 function selectActiveGuild(guilds: DemoGuildIdentity[], requestedTag: ManagedDemoGuildTag) {
@@ -278,6 +317,119 @@ export async function setActiveDemoGuildTag(guildTag: string) {
   });
 
   return targetGuild;
+}
+
+export async function loadPersistedWatchlistState(): Promise<PersistedWatchlistState> {
+  const context = await resolveWatchlistStorageContext();
+
+  if (context.storageMode === "account" && context.viewerId) {
+    const entries = await prisma.guildWatchlistEntry.findMany({
+      where: {
+        userId: context.viewerId,
+      },
+      orderBy: [{ createdAt: "desc" }],
+      select: {
+        guild: {
+          select: {
+            tag: true,
+          },
+        },
+      },
+    });
+
+    return {
+      storageMode: "account",
+      guildTags: sanitizeWatchlistGuildTags(entries.map((entry) => entry.guild.tag)),
+      configured: true,
+    };
+  }
+
+  const cookieStore = await cookies();
+  const cookieValue = cookieStore.get(GUILD_WATCHLIST_COOKIE)?.value;
+
+  if (typeof cookieValue !== "string") {
+    return {
+      storageMode: "demo",
+      guildTags: [],
+      configured: false,
+    };
+  }
+
+  if (cookieValue === GUILD_WATCHLIST_EMPTY_SENTINEL) {
+    return {
+      storageMode: "demo",
+      guildTags: [],
+      configured: true,
+    };
+  }
+
+  return {
+    storageMode: "demo",
+    guildTags: sanitizeWatchlistGuildTags(cookieValue.split(",")),
+    configured: true,
+  };
+}
+
+export async function setPersistedWatchlistGuildTags(
+  guildTags: string[],
+): Promise<PersistedWatchlistState> {
+  const context = await resolveWatchlistStorageContext();
+  const sanitizedGuildTags = sanitizeWatchlistGuildTags(guildTags);
+
+  if (context.storageMode === "account" && context.viewerId) {
+    const guilds = sanitizedGuildTags.length > 0
+      ? await prisma.guild.findMany({
+        where: {
+          tag: {
+            in: sanitizedGuildTags,
+          },
+        },
+        select: {
+          id: true,
+          tag: true,
+        },
+      })
+      : [];
+    const guildIdByTag = new Map(guilds.map((guild) => [guild.tag, guild.id]));
+    const nextGuildTags = sanitizedGuildTags.filter((guildTag) => guildIdByTag.has(guildTag));
+    const operations: Prisma.PrismaPromise<unknown>[] = [
+      prisma.guildWatchlistEntry.deleteMany({
+        where: {
+          userId: context.viewerId,
+        },
+      }),
+      ...nextGuildTags.map((guildTag) =>
+        prisma.guildWatchlistEntry.create({
+          data: {
+            userId: context.viewerId,
+            guildId: guildIdByTag.get(guildTag)!,
+          },
+        }),
+      ),
+    ];
+
+    await prisma.$transaction(operations);
+
+    return {
+      storageMode: "account",
+      guildTags: nextGuildTags,
+      configured: true,
+    };
+  }
+
+  const cookieStore = await cookies();
+  cookieStore.set(GUILD_WATCHLIST_COOKIE, sanitizedGuildTags.length > 0 ? sanitizedGuildTags.join(",") : GUILD_WATCHLIST_EMPTY_SENTINEL, {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 30,
+  });
+
+  return {
+    storageMode: "demo",
+    guildTags: sanitizedGuildTags,
+    configured: true,
+  };
 }
 
 export async function getDemoShellContext(): Promise<DemoShellContext> {

@@ -19,13 +19,22 @@ import {
   getResourceLabel,
 } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
-import { getActiveGuildIdentity } from "@/server/foundation";
+import {
+  getActiveGuildIdentity,
+  loadPersistedWatchlistState,
+  setPersistedWatchlistGuildTags,
+  type WatchlistStorageMode,
+} from "@/server/foundation";
 import {
   loadWorldEventBoardSnapshot,
   type WorldEventBoardSnapshot,
 } from "@/server/world-events";
 
 type Tone = "neutral" | "accent" | "success" | "warning";
+
+function isDefined<T>(value: T | null): value is T {
+  return value !== null;
+}
 
 export type GuildPrestigeContributionKey =
   | "market-sales"
@@ -181,6 +190,63 @@ export type GuildSocialMemoryActivity = {
   counterpartyGuildTag: string | null;
 };
 
+export type GuildWatchlistSnapshot = {
+  storageMode: WatchlistStorageMode;
+  storageLabel: string;
+  summary: string;
+  helperText: string;
+  count: number;
+  maxCount: number;
+  watchedGuildTags: string[];
+  isAutoSeeded: boolean;
+};
+
+export type WatchlistGuildCard = {
+  guildId: string;
+  guildName: string;
+  guildTag: string;
+  profileHref: string;
+  marketHref: string;
+  dealsHref: string;
+  socialSummary: string;
+  watchReasonLabel: string;
+  watchReasonDetail: string;
+  prestige: GuildPrestigeSurface;
+  renown: GuildRenownSurface;
+  isCurrentContext: boolean;
+  isWatched: boolean;
+};
+
+export type PersonalizedSocialFeedEntry = {
+  id: string;
+  guildId: string;
+  guildName: string;
+  guildTag: string;
+  profileHref: string;
+  sourceLabel: string;
+  title: string;
+  summary: string;
+  detail: string;
+  href: string;
+  at: Date;
+  tone: Tone;
+};
+
+export type PersonalizedSocialFeedSnapshot = {
+  summary: string;
+  activeGuildCount: number;
+  latestActivityAt: Date | null;
+  entries: PersonalizedSocialFeedEntry[];
+};
+
+export type DashboardSocialSnapshot = {
+  currentGuildPrestige: GuildPrestigeSummary | null;
+  watchlist: GuildWatchlistSnapshot;
+  followedGuilds: WatchlistGuildCard[];
+  suggestedGuilds: WatchlistGuildCard[];
+  personalizedFeed: PersonalizedSocialFeedSnapshot;
+};
+
 export type GuildPrestigeSummary = {
   guildId: string;
   guildName: string;
@@ -224,6 +290,9 @@ export type GuildLeaderboardSnapshot = {
 export type GuildDirectoryPageData = {
   currentGuildTag: string | null;
   worldEventBoard: WorldEventBoardSnapshot;
+  watchlist: GuildWatchlistSnapshot;
+  followedGuilds: WatchlistGuildCard[];
+  suggestedGuilds: WatchlistGuildCard[];
   community: {
     guildCount: number;
     playerCount: number;
@@ -261,6 +330,7 @@ export type GuildDirectoryPageData = {
     marketHref: string;
     dealsHref: string;
     isCurrentContext: boolean;
+    isWatched: boolean;
   }>;
   players: Array<{
     userId: string;
@@ -283,6 +353,8 @@ export type GuildDirectoryPageData = {
 export type GuildPublicProfilePageData = {
   currentGuildTag: string | null;
   worldEventBoard: WorldEventBoardSnapshot;
+  watchlist: GuildWatchlistSnapshot;
+  isWatched: boolean;
   guild: {
     id: string;
     name: string;
@@ -725,6 +797,121 @@ function buildGuildMarketContextHref(guildTag: string) {
 
 function buildGuildDealsContextHref(guildTag: string) {
   return `/deals?to=${encodeURIComponent(guildTag)}`;
+}
+
+const GUILD_WATCHLIST_LIMIT = 6;
+const WATCHLIST_AUTOFILL_COUNT = 2;
+const PERSONALIZED_FEED_LIMIT = 12;
+
+type SocialWatchContext = {
+  guilds: SocialComputedGuild[];
+  guildsByTag: Map<string, SocialComputedGuild>;
+  currentGuild: SocialComputedGuild | null;
+  currentGuildPrestige: GuildPrestigeSummary | null;
+  watchlist: GuildWatchlistSnapshot;
+  followedGuilds: WatchlistGuildCard[];
+  suggestedGuilds: WatchlistGuildCard[];
+  personalizedFeed: PersonalizedSocialFeedSnapshot;
+};
+
+function buildWatchReason(input: {
+  guild: SocialComputedGuild;
+  currentGuild: SocialComputedGuild | null;
+}) {
+  const favoriteCounterparty = input.currentGuild?.favoriteCounterparties.find(
+    (entry) => entry.guildTag === input.guild.tag,
+  ) ?? null;
+
+  if (favoriteCounterparty) {
+    return {
+      label: favoriteCounterparty.relationshipLabel,
+      detail: favoriteCounterparty.summary,
+    };
+  }
+
+  if (input.guild.recurringSummary.recentInteractions >= 3) {
+    return {
+      label: "Свежая social activity",
+      detail: input.guild.renown.recentInteractionLabel,
+    };
+  }
+
+  if (input.guild.metrics.recentTrustActions >= 2) {
+    return {
+      label: "Строит prestige прямо сейчас",
+      detail: input.guild.reputation.recentTrustLabel,
+    };
+  }
+
+  if (input.guild.renown.score >= 36) {
+    return {
+      label: "Высокий renown",
+      detail: input.guild.renown.spotlight,
+    };
+  }
+
+  if (input.guild.metrics.market >= 3) {
+    return {
+      label: "Активный market house",
+      detail: `Market activity ${input.guild.metrics.market} удерживает дом в живом social слое.`,
+    };
+  }
+
+  return {
+    label: "Rising guild",
+    detail: input.guild.socialSummary,
+  };
+}
+
+function mapToWatchlistGuildCard(input: {
+  guild: SocialComputedGuild;
+  currentGuild: SocialComputedGuild | null;
+  isWatched: boolean;
+}): WatchlistGuildCard {
+  const reason = buildWatchReason(input);
+
+  return {
+    guildId: input.guild.id,
+    guildName: input.guild.name,
+    guildTag: input.guild.tag,
+    profileHref: input.guild.profileHref,
+    marketHref: input.guild.marketHref,
+    dealsHref: input.guild.dealsHref,
+    socialSummary: input.guild.socialSummary,
+    watchReasonLabel: reason.label,
+    watchReasonDetail: reason.detail,
+    prestige: input.guild.reputation,
+    renown: input.guild.renown,
+    isCurrentContext: input.guild.isCurrentContext,
+    isWatched: input.isWatched,
+  };
+}
+
+function buildAutoSeededWatchTags(input: {
+  guilds: SocialComputedGuild[];
+  currentGuild: SocialComputedGuild | null;
+}) {
+  const favoriteTags = input.currentGuild?.favoriteCounterparties.map((entry) => entry.guildTag) ?? [];
+  const fallbackTags = [...input.guilds]
+    .filter((guild) => !guild.isCurrentContext)
+    .sort((left, right) => {
+      const leftFavorite = Number(favoriteTags.includes(left.tag));
+      const rightFavorite = Number(favoriteTags.includes(right.tag));
+
+      if (rightFavorite !== leftFavorite) {
+        return rightFavorite - leftFavorite;
+      }
+
+      return (
+        right.recurringSummary.recentInteractions - left.recurringSummary.recentInteractions ||
+        right.renown.score - left.renown.score ||
+        right.metrics.recentTrustActions - left.metrics.recentTrustActions ||
+        left.tag.localeCompare(right.tag, "ru")
+      );
+    })
+    .map((guild) => guild.tag);
+
+  return [...new Set([...favoriteTags, ...fallbackTags])].slice(0, WATCHLIST_AUTOFILL_COUNT);
 }
 
 function getNextLevelXp(level: number) {
@@ -2074,6 +2261,507 @@ export async function loadGuildPrestigeSummaries(currentGuildTag: string | null)
     .map(mapToPrestigeSummary);
 }
 
+async function loadPersonalizedFeedEntries(input: {
+  watchedGuildTags: string[];
+  worldEventBoard: WorldEventBoardSnapshot;
+}): Promise<PersonalizedSocialFeedEntry[]> {
+  const watchedGuildTags = [...new Set(input.watchedGuildTags.map((guildTag) => guildTag.trim().toUpperCase()))]
+    .filter((guildTag) => guildTag.length > 0);
+
+  if (watchedGuildTags.length === 0) {
+    return [];
+  }
+
+  const watchedSet = new Set(watchedGuildTags);
+  const [soldListings, fulfilledOrders, recentLedgerEntries, recentExpeditions] = await Promise.all([
+    prisma.marketListing.findMany({
+      where: {
+        status: MarketListingStatus.SOLD,
+        soldAt: { not: null },
+      },
+      orderBy: { soldAt: "desc" },
+      take: 24,
+      select: {
+        id: true,
+        quantity: true,
+        totalPriceGold: true,
+        saleTaxGold: true,
+        soldAt: true,
+        resourceType: true,
+        itemDefinition: {
+          select: {
+            name: true,
+            powerScore: true,
+          },
+        },
+        sellerGuild: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+          },
+        },
+        buyerGuild: {
+          select: {
+            name: true,
+            tag: true,
+          },
+        },
+      },
+    }),
+    prisma.buyOrder.findMany({
+      where: {
+        status: BuyOrderStatus.FULFILLED,
+        fulfilledAt: { not: null },
+      },
+      orderBy: { fulfilledAt: "desc" },
+      take: 24,
+      select: {
+        id: true,
+        resourceType: true,
+        quantity: true,
+        totalPriceGold: true,
+        fulfilledAt: true,
+        fulfillerGuild: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+          },
+        },
+        buyerGuild: {
+          select: {
+            name: true,
+            tag: true,
+          },
+        },
+      },
+    }),
+    prisma.economyLedgerEntry.findMany({
+      where: {
+        eventType: {
+          in: [EconomyEventType.TRADE_COMPLETED, EconomyEventType.CONTRACT_REWARD],
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 24,
+      select: {
+        id: true,
+        eventType: true,
+        goldDelta: true,
+        resourceType: true,
+        resourceDelta: true,
+        counterpartyGuildId: true,
+        createdAt: true,
+        guild: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+          },
+        },
+        inventoryItem: {
+          select: {
+            itemDefinition: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    }),
+    prisma.expedition.findMany({
+      where: {
+        status: {
+          in: [ExpeditionStatus.COMPLETED, ExpeditionStatus.CLAIMED],
+        },
+      },
+      orderBy: [{ claimedAt: "desc" }, { resolvedAt: "desc" }],
+      take: 24,
+      select: {
+        id: true,
+        resultTier: true,
+        rewardGold: true,
+        rewardGuildXp: true,
+        resultSummary: true,
+        claimedAt: true,
+        resolvedAt: true,
+        guild: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+          },
+        },
+        location: {
+          select: {
+            name: true,
+            code: true,
+            requiredGuildLevel: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  const counterpartyIds = [...new Set(
+    recentLedgerEntries
+      .filter((entry) => watchedSet.has(entry.guild.tag))
+      .map((entry) => entry.counterpartyGuildId)
+      .filter((value): value is string => Boolean(value)),
+  )];
+  const counterparties = counterpartyIds.length > 0
+    ? await prisma.guild.findMany({
+      where: {
+        id: {
+          in: counterpartyIds,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        tag: true,
+      },
+    })
+    : [];
+  const counterpartyMap = new Map(counterparties.map((guild) => [guild.id, guild]));
+  const seasonalEntries = input.worldEventBoard.recentActivity
+    .filter((entry) => {
+      return watchedSet.has(entry.guildTag)
+        && (entry.sourceLabel === "Workshop"
+          || entry.sourceLabel === "Guild upgrade"
+          || entry.sourceLabel === "Seasonal board");
+    })
+    .map((entry) => ({
+      id: `seasonal-${entry.id}`,
+      guildId: entry.guildId,
+      guildName: entry.guildName,
+      guildTag: entry.guildTag,
+      profileHref: buildGuildProfileHref(entry.guildTag),
+      sourceLabel: entry.sourceLabel,
+      title: entry.title,
+      summary: entry.summary,
+      detail: entry.detail,
+      href: entry.href,
+      at: entry.at,
+      tone: entry.tone,
+    }));
+
+  return [
+    ...soldListings
+      .map((listing) => {
+        if (!watchedSet.has(listing.sellerGuild.tag)) {
+          return null;
+        }
+
+        const details = buildListingDetails(listing);
+        const buyerLabel = listing.buyerGuild
+          ? `${listing.buyerGuild.name} [${listing.buyerGuild.tag}]`
+          : "другой гильдии";
+        const payoutGold = Math.max(0, listing.totalPriceGold - (listing.saleTaxGold ?? 0));
+
+        return {
+          id: `follow-sale-${listing.id}`,
+          guildId: listing.sellerGuild.id,
+          guildName: listing.sellerGuild.name,
+          guildTag: listing.sellerGuild.tag,
+          profileHref: buildGuildProfileHref(listing.sellerGuild.tag),
+          sourceLabel: "Market",
+          title: `${listing.sellerGuild.tag} закрыла публичную продажу`,
+          summary: `${details.itemLabel} ушёл гильдии ${buyerLabel}.`,
+          detail: `${details.detailLabel} · ${listing.totalPriceGold} зол. брутто · ${payoutGold} зол. после tax.`,
+          href: "/market",
+          at: listing.soldAt ?? new Date(0),
+          tone: "success" as const,
+        } satisfies PersonalizedSocialFeedEntry;
+      })
+      .filter(isDefined),
+    ...fulfilledOrders
+      .map((order) => {
+        if (!order.fulfillerGuild || !watchedSet.has(order.fulfillerGuild.tag)) {
+          return null;
+        }
+
+        return {
+          id: `follow-fulfillment-${order.id}`,
+          guildId: order.fulfillerGuild.id,
+          guildName: order.fulfillerGuild.name,
+          guildTag: order.fulfillerGuild.tag,
+          profileHref: buildGuildProfileHref(order.fulfillerGuild.tag),
+          sourceLabel: "Buy order",
+          title: `${order.fulfillerGuild.tag} закрыла чужой buy order`,
+          summary: `${order.buyerGuild.name} [${order.buyerGuild.tag}] получила ${getResourceLabel(order.resourceType)}.`,
+          detail: `${order.quantity} × ${getResourceLabel(order.resourceType)} · payout ${order.totalPriceGold} зол.`,
+          href: "/market",
+          at: order.fulfilledAt ?? new Date(0),
+          tone: "accent" as const,
+        } satisfies PersonalizedSocialFeedEntry;
+      })
+      .filter(isDefined),
+    ...recentLedgerEntries
+      .filter((entry) => watchedSet.has(entry.guild.tag))
+      .map((entry) => {
+        const counterparty = entry.counterpartyGuildId
+          ? counterpartyMap.get(entry.counterpartyGuildId) ?? null
+          : null;
+        const counterpartyLabel = counterparty ? `${counterparty.name} [${counterparty.tag}]` : null;
+        const detail = buildActivityDetail({
+          goldDelta: entry.goldDelta,
+          resourceType: entry.resourceType,
+          resourceDelta: entry.resourceDelta,
+          itemName: entry.inventoryItem?.itemDefinition.name ?? null,
+        });
+
+        if (entry.eventType === EconomyEventType.TRADE_COMPLETED) {
+          return {
+            id: `follow-trade-${entry.id}`,
+            guildId: entry.guild.id,
+            guildName: entry.guild.name,
+            guildTag: entry.guild.tag,
+            profileHref: buildGuildProfileHref(entry.guild.tag),
+            sourceLabel: "Deals",
+            title: "Подтверждена private deal",
+            summary: counterpartyLabel
+              ? `Обмен с ${counterpartyLabel} дошёл до финального акцепта.`
+              : "Private deal завершилась и добавила гильдии trust credit.",
+            detail,
+            href: "/deals",
+            at: entry.createdAt,
+            tone: "success" as const,
+          } satisfies PersonalizedSocialFeedEntry;
+        }
+
+        return {
+          id: `follow-contract-${entry.id}`,
+          guildId: entry.guild.id,
+          guildName: entry.guild.name,
+          guildTag: entry.guild.tag,
+          profileHref: buildGuildProfileHref(entry.guild.tag),
+          sourceLabel: "Contracts",
+          title: "Забран contract reward",
+          summary: "Objective board снова превратился в claimed reward и social credit.",
+          detail,
+          href: "/dashboard",
+          at: entry.createdAt,
+          tone: "accent" as const,
+        } satisfies PersonalizedSocialFeedEntry;
+      }),
+    ...recentExpeditions
+      .map((expedition) => {
+        const riskScore = getRiskScore(expedition.location.code, expedition.location.requiredGuildLevel);
+        const isSuccessful = expedition.resultTier === ExpeditionResultTier.SUCCESS
+          || expedition.resultTier === ExpeditionResultTier.TRIUMPH;
+
+        if (!watchedSet.has(expedition.guild.tag) || !isSuccessful || riskScore < 3) {
+          return null;
+        }
+
+        return {
+          id: `follow-expedition-${expedition.id}`,
+          guildId: expedition.guild.id,
+          guildName: expedition.guild.name,
+          guildTag: expedition.guild.tag,
+          profileHref: buildGuildProfileHref(expedition.guild.tag),
+          sourceLabel: "PvE",
+          title: `${expedition.guild.tag} закрепила high-risk clear`,
+          summary: `${expedition.location.name} дала дому новый frontier prestige signal.`,
+          detail: `${getRiskLabel(riskScore)} · ${expedition.rewardGold} зол. · ${expedition.rewardGuildXp} XP. ${expedition.resultSummary ?? ""}`.trim(),
+          href: "/expedition",
+          at: expedition.claimedAt ?? expedition.resolvedAt ?? new Date(0),
+          tone: expedition.resultTier === ExpeditionResultTier.TRIUMPH ? ("warning" as const) : ("success" as const),
+        } satisfies PersonalizedSocialFeedEntry;
+      })
+      .filter(isDefined),
+    ...seasonalEntries,
+  ]
+    .filter((entry) => entry.at.getTime() > 0)
+    .sort((left, right) => right.at.getTime() - left.at.getTime())
+    .slice(0, PERSONALIZED_FEED_LIMIT);
+}
+
+async function loadSocialWatchContext(input: {
+  currentGuildTag: string | null;
+  precomputedGuilds?: SocialComputedGuild[];
+  worldEventBoard?: WorldEventBoardSnapshot;
+  includeFeed?: boolean;
+}): Promise<SocialWatchContext> {
+  const guilds = input.precomputedGuilds ?? await loadComputedGuilds(input.currentGuildTag);
+  const guildsByTag = new Map(guilds.map((guild) => [guild.tag, guild]));
+  const currentGuild = input.currentGuildTag ? guildsByTag.get(input.currentGuildTag) ?? null : null;
+  const persistedWatchlist = await loadPersistedWatchlistState();
+  const persistedGuildTags = [...new Set(persistedWatchlist.guildTags.map((guildTag) => guildTag.trim().toUpperCase()))]
+    .filter((guildTag) => guildTag !== input.currentGuildTag && guildsByTag.has(guildTag))
+    .slice(0, GUILD_WATCHLIST_LIMIT);
+  const autoSeededGuildTags = persistedWatchlist.storageMode === "demo"
+    && !persistedWatchlist.configured
+    && persistedGuildTags.length === 0
+      ? buildAutoSeededWatchTags({ guilds, currentGuild })
+      : [];
+  const watchedGuildTags = persistedGuildTags.length > 0 || persistedWatchlist.configured
+    ? persistedGuildTags
+    : autoSeededGuildTags;
+  const watchedGuildSet = new Set(watchedGuildTags);
+  const followedGuilds = watchedGuildTags
+    .map((guildTag) => guildsByTag.get(guildTag))
+    .filter((guild): guild is SocialComputedGuild => Boolean(guild))
+    .map((guild) => mapToWatchlistGuildCard({ guild, currentGuild, isWatched: true }));
+  const suggestedGuilds = [...guilds]
+    .filter((guild) => !guild.isCurrentContext && !watchedGuildSet.has(guild.tag))
+    .sort((left, right) => {
+      const leftFavorite = Number(Boolean(currentGuild?.favoriteCounterparties.some((entry) => entry.guildTag === left.tag)));
+      const rightFavorite = Number(Boolean(currentGuild?.favoriteCounterparties.some((entry) => entry.guildTag === right.tag)));
+
+      if (rightFavorite !== leftFavorite) {
+        return rightFavorite - leftFavorite;
+      }
+
+      return (
+        right.recurringSummary.recentInteractions - left.recurringSummary.recentInteractions ||
+        right.renown.score - left.renown.score ||
+        right.metrics.recentTrustActions - left.metrics.recentTrustActions ||
+        left.tag.localeCompare(right.tag, "ru")
+      );
+    })
+    .slice(0, 4)
+    .map((guild) => mapToWatchlistGuildCard({ guild, currentGuild, isWatched: false }));
+  const personalizedFeedEntries = input.includeFeed === false || !input.worldEventBoard
+    ? []
+    : await loadPersonalizedFeedEntries({
+      watchedGuildTags,
+      worldEventBoard: input.worldEventBoard,
+    });
+  const activeGuildCount = new Set(personalizedFeedEntries.map((entry) => entry.guildTag)).size;
+
+  return {
+    guilds,
+    guildsByTag,
+    currentGuild,
+    currentGuildPrestige: currentGuild ? mapToPrestigeSummary(currentGuild) : null,
+    watchlist: {
+      storageMode: persistedWatchlist.storageMode,
+      storageLabel: persistedWatchlist.storageMode === "account" ? "Личный watchlist" : "Sandbox watchlist",
+      summary: followedGuilds.length > 0
+        ? `Отслеживаете ${followedGuilds.length} домов: их сделки, clears и civic spikes теперь складываются в персональную retention-ленту.`
+        : "Watchlist пока пуст: отметьте интересные гильдии, чтобы собрать персональную social activity ленту.",
+      helperText: persistedWatchlist.storageMode === "account"
+        ? "Список хранится за вашим аккаунтом и не зависит от demo sandbox."
+        : autoSeededGuildTags.length > 0
+          ? "Sandbox стартует с seed-watchlist по знакомым домам, чтобы follow feed был живым сразу; дальше список можно свободно перенастроить."
+          : "Sandbox-список живёт в cookie этого браузера и не затрагивает личный аккаунт.",
+      count: followedGuilds.length,
+      maxCount: GUILD_WATCHLIST_LIMIT,
+      watchedGuildTags,
+      isAutoSeeded: autoSeededGuildTags.length > 0,
+    },
+    followedGuilds,
+    suggestedGuilds,
+    personalizedFeed: {
+      summary: followedGuilds.length === 0
+        ? "Подпишитесь на знакомые дома из каталога, и сюда начнут стекаться их market, deal, contract и frontier signals."
+        : personalizedFeedEntries.length > 0
+          ? `${personalizedFeedEntries.length} свежих сигналов от ${activeGuildCount} отслеживаемых домов.`
+          : "Отслеживаемые дома выбраны, но новых social signals в текущем окне пока нет.",
+      activeGuildCount,
+      latestActivityAt: personalizedFeedEntries[0]?.at ?? null,
+      entries: personalizedFeedEntries,
+    },
+  };
+}
+
+export async function loadDashboardSocialSnapshot(input: {
+  currentGuildTag: string | null;
+  worldEventBoard: WorldEventBoardSnapshot;
+}): Promise<DashboardSocialSnapshot> {
+  const watchContext = await loadSocialWatchContext({
+    currentGuildTag: input.currentGuildTag,
+    worldEventBoard: input.worldEventBoard,
+  });
+
+  return {
+    currentGuildPrestige: watchContext.currentGuildPrestige,
+    watchlist: watchContext.watchlist,
+    followedGuilds: watchContext.followedGuilds,
+    suggestedGuilds: watchContext.suggestedGuilds,
+    personalizedFeed: watchContext.personalizedFeed,
+  };
+}
+
+export async function followGuildForCurrentContext(guildTag: string) {
+  const currentGuild = await getActiveGuildIdentity();
+  const normalizedGuildTag = guildTag.trim().toUpperCase();
+
+  if (!normalizedGuildTag) {
+    throw new Error("Укажите гильдию для watchlist.");
+  }
+
+  const watchContext = await loadSocialWatchContext({
+    currentGuildTag: currentGuild?.tag ?? null,
+    includeFeed: false,
+  });
+
+  if (watchContext.currentGuild?.tag === normalizedGuildTag) {
+    throw new Error("Текущую гильдию нельзя добавить в watchlist.");
+  }
+
+  const targetGuild = watchContext.guildsByTag.get(normalizedGuildTag) ?? null;
+
+  if (!targetGuild) {
+    throw new Error("Выбранная гильдия не найдена в public directory.");
+  }
+
+  const currentTags = watchContext.watchlist.watchedGuildTags;
+
+  if (currentTags.includes(normalizedGuildTag)) {
+    return {
+      guildName: targetGuild.name,
+      guildTag: targetGuild.tag,
+      storageMode: watchContext.watchlist.storageMode,
+    };
+  }
+
+  if (currentTags.length >= GUILD_WATCHLIST_LIMIT) {
+    throw new Error(`Watchlist заполнен: максимум ${GUILD_WATCHLIST_LIMIT} гильдий.`);
+  }
+
+  await setPersistedWatchlistGuildTags([normalizedGuildTag, ...currentTags]);
+
+  return {
+    guildName: targetGuild.name,
+    guildTag: targetGuild.tag,
+    storageMode: watchContext.watchlist.storageMode,
+  };
+}
+
+export async function unfollowGuildForCurrentContext(guildTag: string) {
+  const currentGuild = await getActiveGuildIdentity();
+  const normalizedGuildTag = guildTag.trim().toUpperCase();
+
+  if (!normalizedGuildTag) {
+    throw new Error("Укажите гильдию для удаления из watchlist.");
+  }
+
+  const watchContext = await loadSocialWatchContext({
+    currentGuildTag: currentGuild?.tag ?? null,
+    includeFeed: false,
+  });
+  const targetGuild = watchContext.guildsByTag.get(normalizedGuildTag) ?? null;
+
+  if (!targetGuild) {
+    throw new Error("Выбранная гильдия не найдена в public directory.");
+  }
+
+  await setPersistedWatchlistGuildTags(
+    watchContext.watchlist.watchedGuildTags.filter((entry) => entry !== normalizedGuildTag),
+  );
+
+  return {
+    guildName: targetGuild.name,
+    guildTag: targetGuild.tag,
+    storageMode: watchContext.watchlist.storageMode,
+  };
+}
+
 export async function loadGuildDirectoryPageData(): Promise<GuildDirectoryPageData> {
   const currentGuild = await getActiveGuildIdentity();
   const [guilds, worldEventBoard] = await Promise.all([
@@ -2083,11 +2771,20 @@ export async function loadGuildDirectoryPageData(): Promise<GuildDirectoryPageDa
       focusGuildTag: currentGuild?.tag ?? null,
     }),
   ]);
+  const watchContext = await loadSocialWatchContext({
+    currentGuildTag: currentGuild?.tag ?? null,
+    precomputedGuilds: guilds,
+    includeFeed: false,
+  });
   const leaderboards = buildLeaderboards(guilds);
+  const watchedGuildTags = new Set(watchContext.watchlist.watchedGuildTags);
 
   return {
     currentGuildTag: currentGuild?.tag ?? null,
     worldEventBoard,
+    watchlist: watchContext.watchlist,
+    followedGuilds: watchContext.followedGuilds,
+    suggestedGuilds: watchContext.suggestedGuilds,
     community: {
       guildCount: guilds.length,
       playerCount: guilds.length,
@@ -2143,6 +2840,7 @@ export async function loadGuildDirectoryPageData(): Promise<GuildDirectoryPageDa
         marketHref: guild.marketHref,
         dealsHref: guild.dealsHref,
         isCurrentContext: guild.isCurrentContext,
+        isWatched: watchedGuildTags.has(guild.tag),
       })),
     players: [...guilds]
       .sort((left, right) => {
@@ -2194,6 +2892,12 @@ export async function loadGuildPublicProfilePageData(
   if (!computedGuild) {
     throw new Error("Публичная гильдия не найдена.");
   }
+
+  const watchContext = await loadSocialWatchContext({
+    currentGuildTag: currentGuild?.tag ?? null,
+    precomputedGuilds: guilds,
+    includeFeed: false,
+  });
 
   const [guildDetail, soldListings, fulfilledOrders, recentLedgerEntries, recentExpeditions] = await Promise.all([
     prisma.guild.findUnique({
@@ -2467,6 +3171,8 @@ export async function loadGuildPublicProfilePageData(
   return {
     currentGuildTag: currentGuild?.tag ?? null,
     worldEventBoard,
+    watchlist: watchContext.watchlist,
+    isWatched: watchContext.watchlist.watchedGuildTags.includes(computedGuild.tag),
     guild: {
       id: computedGuild.id,
       name: computedGuild.name,

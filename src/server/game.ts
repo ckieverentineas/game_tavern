@@ -49,12 +49,16 @@ import {
   getActiveGuildIdentity,
 } from "@/server/foundation";
 import {
+  loadDashboardSocialSnapshot,
   loadGuildDirectoryPageData,
   loadGuildPrestigeSummaries,
   loadGuildPublicProfilePageData,
   type GuildDirectoryPageData,
   type GuildPrestigeSummary,
   type GuildPublicProfilePageData,
+  type GuildWatchlistSnapshot,
+  type PersonalizedSocialFeedSnapshot,
+  type WatchlistGuildCard,
 } from "@/server/social";
 import {
   buildWorldEventRewardLabels,
@@ -920,6 +924,10 @@ export type DashboardPageData = {
   };
   onboarding: OnboardingSnapshot;
   guildPrestige: GuildPrestigeSummary | null;
+  watchlist: GuildWatchlistSnapshot;
+  followedGuilds: WatchlistGuildCard[];
+  suggestedGuilds: WatchlistGuildCard[];
+  personalizedFeed: PersonalizedSocialFeedSnapshot;
   worldEventBoard: WorldEventBoardSnapshot;
 };
 
@@ -5216,7 +5224,6 @@ export async function getDashboardPageData(): Promise<FoundationResult<Dashboard
       buyOrderHistory,
       locations,
       onboarding,
-      prestigeSummaries,
       worldEventBoard,
     ] = await Promise.all([
       prisma.hero.count({ where: { guildId: freshGuild.id } }),
@@ -5327,13 +5334,16 @@ export async function getDashboardPageData(): Promise<FoundationResult<Dashboard
         },
       }),
       loadOnboardingSnapshot(freshGuild.id),
-      loadGuildPrestigeSummaries(freshGuild.tag),
       loadWorldEventBoardSnapshot({
         currentGuildTag: freshGuild.tag,
         focusGuildTag: freshGuild.tag,
       }),
     ]);
-    const guildPrestige = prestigeSummaries.find((entry) => entry.guildTag === freshGuild.tag) ?? null;
+    const socialDashboard = await loadDashboardSocialSnapshot({
+      currentGuildTag: freshGuild.tag,
+      worldEventBoard,
+    });
+    const guildPrestige = socialDashboard.currentGuildPrestige;
 
     const upgradeLevels = mapManagedGuildUpgradeLevels(guildUpgrades);
     const nextUpgrade = getNextMarketUpgrade(upgradeLevels[GuildUpgradeType.MARKET_SLOTS]);
@@ -5610,6 +5620,10 @@ export async function getDashboardPageData(): Promise<FoundationResult<Dashboard
       },
       onboarding,
       guildPrestige,
+      watchlist: socialDashboard.watchlist,
+      followedGuilds: socialDashboard.followedGuilds,
+      suggestedGuilds: socialDashboard.suggestedGuilds,
+      personalizedFeed: socialDashboard.personalizedFeed,
       worldEventBoard,
     };
   });

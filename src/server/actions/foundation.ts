@@ -43,6 +43,7 @@ import {
   setActivePlayContext,
   setActiveDemoGuildTag,
 } from "@/server/foundation";
+import { followGuildForCurrentContext, unfollowGuildForCurrentContext } from "@/server/social";
 
 type StatusTone = "success" | "warning" | "danger";
 type SupportedGuildUpgradeType =
@@ -63,6 +64,10 @@ const SAFE_REDIRECTS = new Set([
   "/guilds",
 ]);
 
+function isSafeRedirectPath(path: string) {
+  return SAFE_REDIRECTS.has(path) || /^\/guilds\/[A-Za-z0-9_-]+$/.test(path);
+}
+
 function isResourceType(value: string | null): value is ResourceType {
   return value !== null && Object.values(ResourceType).includes(value as ResourceType);
 }
@@ -79,7 +84,7 @@ function isGuildUpgradeType(value: string | null): value is SupportedGuildUpgrad
 function getRedirectPath(formData: FormData, fallback: string) {
   const redirectTo = formData.get("redirectTo");
 
-  if (typeof redirectTo === "string" && SAFE_REDIRECTS.has(redirectTo)) {
+  if (typeof redirectTo === "string" && isSafeRedirectPath(redirectTo)) {
     return redirectTo;
   }
 
@@ -370,6 +375,58 @@ export async function switchActiveGuild(formData: FormData) {
         revalidatePath(redirectPath);
         message = `Активная гильдия переключена на ${guild.name} [${guild.tag}].`;
       }
+  } catch (error) {
+    tone = "danger";
+    message = describeFoundationError(error);
+  }
+
+  redirect(buildRedirectUrl(redirectPath, tone, message));
+}
+
+export async function followGuild(formData: FormData) {
+  const redirectPath = getRedirectPath(formData, "/guilds");
+  let tone: StatusTone = "success";
+  let message = "";
+
+  try {
+    const guildTag = readString(formData, "guildTag");
+
+    if (!guildTag) {
+      throw new Error("Укажите гильдию для watchlist.");
+    }
+
+    const result = await followGuildForCurrentContext(guildTag);
+    revalidatePath("/", "layout");
+    revalidateMany(["/dashboard", "/guilds"]);
+    revalidatePath(`/guilds/${encodeURIComponent(result.guildTag)}`);
+    revalidatePath(redirectPath);
+    message = `${result.guildName} [${result.guildTag}] добавлена в ${result.storageMode === "account" ? "личный watchlist" : "sandbox watchlist"}.`;
+  } catch (error) {
+    tone = "danger";
+    message = describeFoundationError(error);
+  }
+
+  redirect(buildRedirectUrl(redirectPath, tone, message));
+}
+
+export async function unfollowGuild(formData: FormData) {
+  const redirectPath = getRedirectPath(formData, "/guilds");
+  let tone: StatusTone = "success";
+  let message = "";
+
+  try {
+    const guildTag = readString(formData, "guildTag");
+
+    if (!guildTag) {
+      throw new Error("Укажите гильдию для удаления из watchlist.");
+    }
+
+    const result = await unfollowGuildForCurrentContext(guildTag);
+    revalidatePath("/", "layout");
+    revalidateMany(["/dashboard", "/guilds"]);
+    revalidatePath(`/guilds/${encodeURIComponent(result.guildTag)}`);
+    revalidatePath(redirectPath);
+    message = `${result.guildName} [${result.guildTag}] убрана из ${result.storageMode === "account" ? "личного watchlist" : "sandbox watchlist"}.`;
   } catch (error) {
     tone = "danger";
     message = describeFoundationError(error);

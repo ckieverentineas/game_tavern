@@ -33,6 +33,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   await prisma.authSession.deleteMany();
+  await prisma.guildWatchlistEntry.deleteMany();
   await prisma.auditFlag.deleteMany();
   await prisma.economyLedgerEntry.deleteMany();
   await prisma.tradeOfferItem.deleteMany();
