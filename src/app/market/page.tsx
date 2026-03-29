@@ -100,6 +100,12 @@ export default async function MarketPage({
         </Notice>
       ) : null}
 
+      {data.guildPrestige ? (
+        <Notice tone={data.guildPrestige.renown.tone}>
+          <strong>{data.guildPrestige.renown.tierLabel}.</strong> {data.guildPrestige.renown.spotlight}
+        </Notice>
+      ) : null}
+
       {data.highlightedGuildContext ? (
         <Notice tone="success">
           Публичный контекст {data.highlightedGuildContext.name} [{data.highlightedGuildContext.tag}] уже
@@ -107,6 +113,9 @@ export default async function MarketPage({
           orders этой гильдии. Это мягкий social bridge от public profile к реальному взаимодействию.
           {data.highlightedGuildContext.prestige
             ? ` ${data.highlightedGuildContext.prestige.tierLabel} · ${data.highlightedGuildContext.prestige.primaryBadgeLabel ?? data.highlightedGuildContext.prestige.descriptor}.`
+            : ""}
+          {data.highlightedGuildContext.renown
+            ? ` ${data.highlightedGuildContext.renown.tierLabel} · ${data.highlightedGuildContext.relationshipLabel ?? data.highlightedGuildContext.renown.primaryPerkLabel ?? data.highlightedGuildContext.renown.recurringLabel}.`
             : ""}
         </Notice>
       ) : null}
@@ -232,8 +241,42 @@ export default async function MarketPage({
         <InfoCard title="Market access" value={data.marketUnlocked ? "Open" : "Locked"} detail="Доступ определяется прогрессией активной гильдии." tone="accent" />
         <InfoCard title="Active listings" value={data.activeListings.length} detail={`${activeItemListings} item-лотов и ${data.activeListings.length - activeItemListings} resource-лотов в витрине.`} />
         <InfoCard title="Request board" value={data.activeBuyOrders.length} detail={`${data.fulfillableBuyOrders.length} заявок можно закрыть из текущей активной гильдии.`} tone="success" />
-        <InfoCard title="Claim box" value={data.claimBox.length} detail="Здесь сходятся продажи, возвраты лотов, buy-order payouts и gold refunds." />
+        <InfoCard title="Claim box" value={data.claimBox.length} detail={data.guildPrestige ? `${data.guildPrestige.renown.recentInteractionLabel} ${data.guildPrestige.renown.favoriteCounterpartyLabel ? `Favorite trader: ${data.guildPrestige.renown.favoriteCounterpartyLabel}.` : ""}` : "Здесь сходятся продажи, возвраты лотов, buy-order payouts и gold refunds."} />
       </div>
+
+      {data.guildPrestige?.favoriteCounterparties.length ? (
+        <SectionCard
+          title="Favorite traders on this market"
+          description="Мягкий retention hook: знакомые дома уже собраны из повторных market/deal/request interactions и подсвечиваются прямо перед торговлей."
+          aside={<Pill tone={data.guildPrestige.renown.tone}>{data.guildPrestige.renown.tierLabel}</Pill>}
+        >
+          <div className="stack-sm">
+            {data.guildPrestige.favoriteCounterparties.map((counterparty) => (
+              <article key={counterparty.guildId} className="row-card">
+                <div>
+                  <div className="row-card__title">
+                    {counterparty.guildName} [{counterparty.guildTag}]
+                  </div>
+                  <p className="row-card__description">
+                    {counterparty.relationshipLabel} · {counterparty.summary}
+                    <br />
+                    {counterparty.interactionCount} interactions · {counterparty.channelCount} channels · {counterparty.recentInteractions} recent
+                  </p>
+                </div>
+                <div className="row-card__aside">
+                  <Pill tone={counterparty.isCurrentContext ? "success" : "accent"}>{counterparty.relationshipLabel}</Pill>
+                  <Link className="button button--ghost" href={counterparty.profileHref}>
+                    Профиль
+                  </Link>
+                  <Link className="button button--ghost" href={counterparty.dealsHref}>
+                    Deal CTA
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        </SectionCard>
+      ) : null}
 
       <div className="content-grid content-grid--two-thirds">
         <SectionCard title="Выставить предмет" description="Лот создаётся с мгновенной оплатой listing fee и блокировкой экземпляра предмета.">
@@ -386,13 +429,16 @@ export default async function MarketPage({
                     {listing.valueSummary}
                   </p>
                 </div>
-                <div className="row-card__aside">
-                  <Pill tone={listing.isMine ? "accent" : "success"}>
-                    {listing.isMine ? "Ваш лот" : listing.sellerLabel}
-                  </Pill>
-                  {data.highlightedGuildContext && listing.sellerGuildTag === data.highlightedGuildContext.tag ? (
-                    <Pill tone="accent">В фокусе</Pill>
-                  ) : null}
+                  <div className="row-card__aside">
+                    <Pill tone={listing.isMine ? "accent" : "success"}>
+                      {listing.isMine ? "Ваш лот" : listing.sellerLabel}
+                    </Pill>
+                    {data.guildPrestige?.favoriteCounterparties.some((entry) => entry.guildTag === listing.sellerGuildTag) ? (
+                      <Pill tone="success">Familiar trader</Pill>
+                    ) : null}
+                    {data.highlightedGuildContext && listing.sellerGuildTag === data.highlightedGuildContext.tag ? (
+                      <Pill tone="accent">В фокусе</Pill>
+                    ) : null}
                   <span className="muted">До {formatDateTime(listing.expiresAt)}</span>
                   {listing.isMine ? (
                     <form action={cancelMarketListing} className="inline-form">
@@ -524,6 +570,9 @@ export default async function MarketPage({
                     <Pill tone={order.isMine ? "accent" : order.canFulfill ? "success" : "warning"}>
                       {order.isMine ? "Ваша заявка" : order.canFulfill ? "Можно исполнить" : "Нужен ресурс"}
                     </Pill>
+                    {data.guildPrestige?.favoriteCounterparties.some((entry) => entry.guildTag === order.buyerGuildTag) ? (
+                      <Pill tone="success">Known house</Pill>
+                    ) : null}
                     <span className="muted">До {formatDateTime(order.expiresAt)}</span>
                     {order.isMine ? (
                       <form action={cancelBuyOrder} className="inline-form">

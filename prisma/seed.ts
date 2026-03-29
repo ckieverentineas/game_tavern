@@ -2476,7 +2476,16 @@ async function main() {
     ],
   });
 
-  const [cinderListing, mossListing, cinderBuyOrder, mossBuyOrder, cinderExpedition, mossExpedition] = await Promise.all([
+  const [
+    cinderListing,
+    mossListing,
+    cinderSoldToMoss,
+    mossSoldToCinder,
+    cinderBuyOrder,
+    mossBuyOrder,
+    cinderExpedition,
+    mossExpedition,
+  ] = await Promise.all([
     prisma.marketListing.create({
       data: {
         sellerGuildId: cinderGuild.id,
@@ -2503,6 +2512,38 @@ async function main() {
         status: MarketListingStatus.ACTIVE,
         createdAt: hoursAgo(3),
         expiresAt: hoursFromNow(9),
+      },
+    }),
+    prisma.marketListing.create({
+      data: {
+        sellerGuildId: cinderGuild.id,
+        buyerGuildId: mossGuild.id,
+        listingType: ListingType.RESOURCE,
+        resourceType: ResourceType.ARCANE_DUST,
+        quantity: 3,
+        totalPriceGold: 33,
+        listingFeeGold: 2,
+        saleTaxGold: 4,
+        status: MarketListingStatus.SOLD,
+        createdAt: hoursAgo(17),
+        expiresAt: hoursAgo(5),
+        soldAt: hoursAgo(8.5),
+      },
+    }),
+    prisma.marketListing.create({
+      data: {
+        sellerGuildId: mossGuild.id,
+        buyerGuildId: cinderGuild.id,
+        listingType: ListingType.RESOURCE,
+        resourceType: ResourceType.HERBS,
+        quantity: 8,
+        totalPriceGold: 40,
+        listingFeeGold: 2,
+        saleTaxGold: 4,
+        status: MarketListingStatus.SOLD,
+        createdAt: hoursAgo(14),
+        expiresAt: hoursAgo(4),
+        soldAt: hoursAgo(6.75),
       },
     }),
     prisma.buyOrder.create({
@@ -2604,6 +2645,17 @@ async function main() {
       },
       {
         guildId: cinderGuild.id,
+        eventType: EconomyEventType.MARKET_SALE,
+        referenceType: ReferenceType.MARKET_LISTING,
+        referenceId: cinderSoldToMoss.id,
+        goldDelta: 29,
+        resourceType: ResourceType.ARCANE_DUST,
+        resourceDelta: -3,
+        counterpartyGuildId: mossGuild.id,
+        createdAt: hoursAgo(8.5),
+      },
+      {
+        guildId: cinderGuild.id,
         eventType: EconomyEventType.BUY_ORDER_POSTED,
         referenceType: ReferenceType.BUY_ORDER,
         referenceId: cinderBuyOrder.id,
@@ -2659,6 +2711,17 @@ async function main() {
         referenceId: mossListing.id,
         goldDelta: -3,
         createdAt: hoursAgo(3),
+      },
+      {
+        guildId: mossGuild.id,
+        eventType: EconomyEventType.MARKET_SALE,
+        referenceType: ReferenceType.MARKET_LISTING,
+        referenceId: mossSoldToCinder.id,
+        goldDelta: 36,
+        resourceType: ResourceType.HERBS,
+        resourceDelta: -8,
+        counterpartyGuildId: cinderGuild.id,
+        createdAt: hoursAgo(6.75),
       },
       {
         guildId: mossGuild.id,

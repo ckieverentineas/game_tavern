@@ -8,6 +8,7 @@ import {
   MarketListingStatus,
   Prisma,
   ResourceType,
+  TradeOfferStatus,
 } from "@prisma/client";
 
 import {
@@ -70,6 +71,116 @@ export type GuildPrestigeSnapshot = GuildPrestigeSurface & {
   rankingContributions: GuildPrestigeContribution[];
 };
 
+export type GuildRenownContributionKey =
+  | "favorite-traders"
+  | "repeat-business"
+  | "cross-channel-links"
+  | "recent-social-memory";
+
+export type GuildRenownTierKey =
+  | "new-contact"
+  | "known-counterparty"
+  | "familiar-house"
+  | "preferred-network"
+  | "renowned-circle";
+
+export type GuildRenownBadge = {
+  key:
+    | "first-impressions"
+    | "familiar-face"
+    | "house-favorite"
+    | "cross-channel-tie"
+    | "social-streak";
+  label: string;
+  description: string;
+  tone: Tone;
+};
+
+export type GuildRenownPerk = {
+  key: "directory-spotlight" | "preferred-trader-callout" | "social-badge" | "memory-recap";
+  label: string;
+  description: string;
+  tone: Tone;
+};
+
+export type GuildFavoriteCounterparty = {
+  guildId: string;
+  guildName: string;
+  guildTag: string;
+  profileHref: string;
+  marketHref: string;
+  dealsHref: string;
+  interactionCount: number;
+  recentInteractions: number;
+  marketSalesAsSeller: number;
+  marketSalesAsBuyer: number;
+  buyOrderSupplied: number;
+  buyOrderReceived: number;
+  acceptedDeals: number;
+  channelCount: number;
+  strengthScore: number;
+  relationshipLabel: string;
+  summary: string;
+  lastInteractionAt: Date | null;
+  isCurrentContext: boolean;
+};
+
+export type GuildRecurringInteractionSummary = {
+  activeCounterparties: number;
+  recurringCounterparties: number;
+  repeatBusinessCount: number;
+  crossChannelCounterparties: number;
+  recentInteractions: number;
+  favoriteCounterpartyLabel: string | null;
+  summary: string;
+  spotlight: string;
+};
+
+export type GuildRenownContribution = {
+  key: GuildRenownContributionKey;
+  label: string;
+  value: number;
+  score: number;
+  detail: string;
+};
+
+export type GuildRenownSurface = {
+  score: number;
+  rank: number;
+  total: number;
+  tierKey: GuildRenownTierKey;
+  tierLabel: string;
+  descriptor: string;
+  summary: string;
+  spotlight: string;
+  tone: Tone;
+  recentInteractionCount: number;
+  recentInteractionLabel: string;
+  recurringCounterparties: number;
+  recurringLabel: string;
+  favoriteCounterpartyLabel: string | null;
+  primaryBadgeLabel: string | null;
+  primaryPerkLabel: string | null;
+  badges: GuildRenownBadge[];
+  perks: GuildRenownPerk[];
+};
+
+export type GuildRenownSnapshot = GuildRenownSurface & {
+  rankingContributions: GuildRenownContribution[];
+};
+
+export type GuildSocialMemoryActivity = {
+  id: string;
+  sourceLabel: string;
+  title: string;
+  summary: string;
+  detail: string;
+  at: Date;
+  href: string;
+  tone: Tone;
+  counterpartyGuildTag: string | null;
+};
+
 export type GuildPrestigeSummary = {
   guildId: string;
   guildName: string;
@@ -79,9 +190,12 @@ export type GuildPrestigeSummary = {
   dealsHref: string;
   isCurrentContext: boolean;
   prestige: GuildPrestigeSurface;
+  renown: GuildRenownSurface;
+  recurringSummary: GuildRecurringInteractionSummary;
+  favoriteCounterparties: GuildFavoriteCounterparty[];
 };
 
-export type GuildLeaderboardKey = "prestige" | "level" | "wealth" | "power" | "market";
+export type GuildLeaderboardKey = "renown" | "prestige" | "level" | "wealth" | "power" | "market";
 
 export type GuildLeaderboardSnapshot = {
   key: GuildLeaderboardKey;
@@ -100,7 +214,10 @@ export type GuildLeaderboardSnapshot = {
     href: string;
     isCurrentContext: boolean;
     tierLabel: string;
+    renownTierLabel: string;
     primaryBadgeLabel: string | null;
+    primaryRenownPerkLabel: string | null;
+    favoriteCounterpartyLabel: string | null;
   }>;
 };
 
@@ -115,7 +232,9 @@ export type GuildDirectoryPageData = {
     contractsClaimed: number;
     resolvedExpeditions: number;
     prestigeLeaders: number;
+    renownLeaders: number;
     recentTrustActions: number;
+    recurringPairs: number;
   };
   leaderboards: GuildLeaderboardSnapshot[];
   guilds: Array<{
@@ -124,6 +243,7 @@ export type GuildDirectoryPageData = {
     guildTag: string;
     ownerDisplayName: string;
     prestige: GuildPrestigeSurface;
+    renown: GuildRenownSurface;
     level: number;
     gold: number;
     rosterPower: number;
@@ -135,6 +255,8 @@ export type GuildDirectoryPageData = {
     completedExpeditions: number;
     pveLabel: string;
     socialSummary: string;
+    favoriteCounterparties: GuildFavoriteCounterparty[];
+    recurringSummary: GuildRecurringInteractionSummary;
     profileHref: string;
     marketHref: string;
     dealsHref: string;
@@ -146,6 +268,7 @@ export type GuildDirectoryPageData = {
     guildName: string;
     guildTag: string;
     prestige: GuildPrestigeSurface;
+    renown: GuildRenownSurface;
     guildLevel: number;
     rosterPower: number;
     marketActivity: number;
@@ -189,6 +312,7 @@ export type GuildPublicProfilePageData = {
     isCurrentContext: boolean;
   };
   prestige: GuildPrestigeSnapshot;
+  renown: GuildRenownSnapshot;
   leaderboardPlacements: Array<{
     key: GuildLeaderboardKey;
     title: string;
@@ -236,6 +360,9 @@ export type GuildPublicProfilePageData = {
     href: string;
     tone: Tone;
   }>;
+  socialMemory: GuildSocialMemoryActivity[];
+  favoriteTraders: GuildFavoriteCounterparty[];
+  recurringSummary: GuildRecurringInteractionSummary;
   socialCtas: {
     directoryHref: string;
     marketHref: string;
@@ -289,12 +416,30 @@ type SocialComputedGuild = {
   heroes: SocialGuildRecord["heroes"];
   metrics: SocialGuildMetrics;
   reputation: GuildPrestigeSnapshot;
+  renown: GuildRenownSnapshot;
+  recurringSummary: GuildRecurringInteractionSummary;
+  favoriteCounterparties: GuildFavoriteCounterparty[];
   pveLabel: string;
   socialSummary: string;
   profileHref: string;
   marketHref: string;
   dealsHref: string;
   isCurrentContext: boolean;
+};
+
+type CounterpartyChannelKey = "market" | "demand" | "deal";
+
+type RawCounterpartyMemory = {
+  counterpartyGuildId: string;
+  interactionCount: number;
+  recentInteractions: number;
+  marketSalesAsSeller: number;
+  marketSalesAsBuyer: number;
+  buyOrderSupplied: number;
+  buyOrderReceived: number;
+  acceptedDeals: number;
+  lastInteractionAt: Date | null;
+  channels: Set<CounterpartyChannelKey>;
 };
 
 const PRESTIGE_RECENT_WINDOW_MS = 1000 * 60 * 60 * 72;
@@ -369,6 +514,44 @@ const prestigeTierDefinitions = [
   },
 ] as const;
 
+const renownTierDefinitions = [
+  {
+    key: "new-contact",
+    minScore: 0,
+    label: "New contact",
+    tone: "neutral",
+    description: "Гильдия только собирает первые знакомые имена и ещё не сформировала повторный social loop.",
+  },
+  {
+    key: "known-counterparty",
+    minScore: 18,
+    label: "Known counterparty",
+    tone: "accent",
+    description: "На рынке и в deals уже появляются первые знакомые дома, к которым хочется вернуться ещё раз.",
+  },
+  {
+    key: "familiar-house",
+    minScore: 36,
+    label: "Familiar house",
+    tone: "success",
+    description: "Гильдия собрала повторные связи и читается как приятный знакомый контрагент, а не анонимный ник.",
+  },
+  {
+    key: "preferred-network",
+    minScore: 60,
+    label: "Preferred network",
+    tone: "accent",
+    description: "Контрагенты возвращаются сериями через рынок, buy orders и private deals, формируя устойчивую social retention-сеть.",
+  },
+  {
+    key: "renowned-circle",
+    minScore: 88,
+    label: "Renowned circle",
+    tone: "accent",
+    description: "Вокруг гильдии уже сложился узнаваемый круг повторных связей, который сам подталкивает к следующим визитам.",
+  },
+] as const;
+
 const prestigeContributionDefinitions = [
   {
     key: "market-sales",
@@ -414,7 +597,73 @@ const prestigeContributionDefinitions = [
   },
 ] as const;
 
+const renownContributionDefinitions = [
+  {
+    key: "favorite-traders",
+    label: "Favorite traders",
+    getValue: (input: {
+      recurringSummary: GuildRecurringInteractionSummary;
+      favoriteCounterparties: GuildFavoriteCounterparty[];
+    }) => input.favoriteCounterparties.filter((entry) => entry.interactionCount >= 2).length,
+    getScore: (input: {
+      recurringSummary: GuildRecurringInteractionSummary;
+      favoriteCounterparties: GuildFavoriteCounterparty[];
+    }) => {
+      const favoriteCount = input.favoriteCounterparties.filter((entry) => entry.interactionCount >= 2).length;
+      const topStrength = input.favoriteCounterparties[0]?.strengthScore ?? 0;
+
+      return favoriteCount * 12 + Math.min(18, Math.floor(topStrength / 8) * 3);
+    },
+    getDetail: (input: {
+      recurringSummary: GuildRecurringInteractionSummary;
+      favoriteCounterparties: GuildFavoriteCounterparty[];
+    }) => {
+      const labels = input.favoriteCounterparties.slice(0, 2).map((entry) => `${entry.guildTag} (${entry.interactionCount})`);
+
+      return labels.length > 0
+        ? `Топ знакомые дома: ${labels.join(" • ")}.`
+        : "Любой повторный контрагент сразу начнёт собирать familiar-house слой.";
+    },
+  },
+  {
+    key: "repeat-business",
+    label: "Repeat business",
+    getValue: (input: { recurringSummary: GuildRecurringInteractionSummary }) => input.recurringSummary.repeatBusinessCount,
+    getScore: (input: { recurringSummary: GuildRecurringInteractionSummary }) => input.recurringSummary.repeatBusinessCount * 8,
+    getDetail: (input: { recurringSummary: GuildRecurringInteractionSummary }) =>
+      `${input.recurringSummary.recurringCounterparties} повторных связей дали ${input.recurringSummary.repeatBusinessCount} возвратов к уже знакомым домам.`,
+  },
+  {
+    key: "cross-channel-links",
+    label: "Cross-channel links",
+    getValue: (input: { recurringSummary: GuildRecurringInteractionSummary }) => input.recurringSummary.crossChannelCounterparties,
+    getScore: (input: { recurringSummary: GuildRecurringInteractionSummary }) => input.recurringSummary.crossChannelCounterparties * 18,
+    getDetail: (input: { recurringSummary: GuildRecurringInteractionSummary }) =>
+      `${input.recurringSummary.crossChannelCounterparties} знакомых домов живут сразу в нескольких каналах: market, request board или deals.`,
+  },
+  {
+    key: "recent-social-memory",
+    label: "Recent social memory",
+    getValue: (input: { recurringSummary: GuildRecurringInteractionSummary }) => input.recurringSummary.recentInteractions,
+    getScore: (input: { recurringSummary: GuildRecurringInteractionSummary }) =>
+      Math.min(24, input.recurringSummary.recentInteractions * 6),
+    getDetail: (input: { recurringSummary: GuildRecurringInteractionSummary }) =>
+      input.recurringSummary.recentInteractions > 0
+        ? `${input.recurringSummary.recentInteractions} свежих social memory-сигналов удерживают ощущение живого знакомого мира.`
+        : "Свежие повторные сделки быстро оживят memory recap и preferred-trader callouts.",
+  },
+] as const;
+
 const leaderboardDefinitions = [
+  {
+    key: "renown",
+    title: "Renown leaderboard",
+    description: "Кто уже собрал знакомые дома, repeat business и preferred-trader связи, ради которых хочется возвращаться сериями.",
+    metricLabel: "Renown",
+    getValue: (guild: SocialComputedGuild) => guild.renown.score,
+    getValueLabel: (guild: SocialComputedGuild) => `${guild.renown.score} renown`,
+    getDetail: (guild: SocialComputedGuild) => guild.renown.summary,
+  },
   {
     key: "prestige",
     title: "Prestige leaderboard",
@@ -741,6 +990,496 @@ function buildPveMetrics(
   };
 }
 
+function ensureCounterpartyMemory(
+  memories: Map<string, Map<string, RawCounterpartyMemory>>,
+  guildId: string,
+  counterpartyGuildId: string,
+) {
+  const guildMemories = memories.get(guildId) ?? new Map<string, RawCounterpartyMemory>();
+  const memory = guildMemories.get(counterpartyGuildId) ?? {
+    counterpartyGuildId,
+    interactionCount: 0,
+    recentInteractions: 0,
+    marketSalesAsSeller: 0,
+    marketSalesAsBuyer: 0,
+    buyOrderSupplied: 0,
+    buyOrderReceived: 0,
+    acceptedDeals: 0,
+    lastInteractionAt: null,
+    channels: new Set<CounterpartyChannelKey>(),
+  };
+
+  guildMemories.set(counterpartyGuildId, memory);
+  memories.set(guildId, guildMemories);
+
+  return memory;
+}
+
+function registerCounterpartyInteraction(
+  memories: Map<string, Map<string, RawCounterpartyMemory>>,
+  input: {
+    guildId: string | null | undefined;
+    counterpartyGuildId: string | null | undefined;
+    channel: CounterpartyChannelKey;
+    at: Date | null | undefined;
+    field:
+      | "marketSalesAsSeller"
+      | "marketSalesAsBuyer"
+      | "buyOrderSupplied"
+      | "buyOrderReceived"
+      | "acceptedDeals";
+  },
+) {
+  if (!input.guildId || !input.counterpartyGuildId || input.guildId === input.counterpartyGuildId) {
+    return;
+  }
+
+  const memory = ensureCounterpartyMemory(memories, input.guildId, input.counterpartyGuildId);
+  memory.interactionCount += 1;
+  memory[input.field] += 1;
+  memory.channels.add(input.channel);
+
+  if (isWithinRecentWindow(input.at)) {
+    memory.recentInteractions += 1;
+  }
+
+  if (input.at && (!memory.lastInteractionAt || input.at.getTime() > memory.lastInteractionAt.getTime())) {
+    memory.lastInteractionAt = input.at;
+  }
+}
+
+function buildCounterpartyMemories(input: {
+  marketRows: Array<{
+    sellerGuildId: string;
+    buyerGuildId: string | null;
+    status: MarketListingStatus;
+    soldAt: Date | null;
+  }>;
+  buyOrderRows: Array<{
+    buyerGuildId: string;
+    fulfillerGuildId: string | null;
+    status: BuyOrderStatus;
+    fulfilledAt: Date | null;
+  }>;
+  tradeOfferRows: Array<{
+    senderGuildId: string;
+    receiverGuildId: string;
+    status: TradeOfferStatus;
+    createdAt: Date;
+    respondedAt: Date | null;
+  }>;
+}) {
+  const memories = new Map<string, Map<string, RawCounterpartyMemory>>();
+
+  for (const row of input.marketRows) {
+    if (row.status !== MarketListingStatus.SOLD || !row.buyerGuildId) {
+      continue;
+    }
+
+    registerCounterpartyInteraction(memories, {
+      guildId: row.sellerGuildId,
+      counterpartyGuildId: row.buyerGuildId,
+      channel: "market",
+      at: row.soldAt,
+      field: "marketSalesAsSeller",
+    });
+    registerCounterpartyInteraction(memories, {
+      guildId: row.buyerGuildId,
+      counterpartyGuildId: row.sellerGuildId,
+      channel: "market",
+      at: row.soldAt,
+      field: "marketSalesAsBuyer",
+    });
+  }
+
+  for (const row of input.buyOrderRows) {
+    if (row.status !== BuyOrderStatus.FULFILLED || !row.fulfillerGuildId) {
+      continue;
+    }
+
+    registerCounterpartyInteraction(memories, {
+      guildId: row.fulfillerGuildId,
+      counterpartyGuildId: row.buyerGuildId,
+      channel: "demand",
+      at: row.fulfilledAt,
+      field: "buyOrderSupplied",
+    });
+    registerCounterpartyInteraction(memories, {
+      guildId: row.buyerGuildId,
+      counterpartyGuildId: row.fulfillerGuildId,
+      channel: "demand",
+      at: row.fulfilledAt,
+      field: "buyOrderReceived",
+    });
+  }
+
+  for (const row of input.tradeOfferRows) {
+    if (row.status !== TradeOfferStatus.ACCEPTED) {
+      continue;
+    }
+
+    const finalAt = row.respondedAt ?? row.createdAt;
+    registerCounterpartyInteraction(memories, {
+      guildId: row.senderGuildId,
+      counterpartyGuildId: row.receiverGuildId,
+      channel: "deal",
+      at: finalAt,
+      field: "acceptedDeals",
+    });
+    registerCounterpartyInteraction(memories, {
+      guildId: row.receiverGuildId,
+      counterpartyGuildId: row.senderGuildId,
+      channel: "deal",
+      at: finalAt,
+      field: "acceptedDeals",
+    });
+  }
+
+  return memories;
+}
+
+function buildRelationshipLabel(memory: RawCounterpartyMemory) {
+  if (memory.channels.size >= 3 || (memory.channels.size >= 2 && memory.interactionCount >= 4)) {
+    return "Preferred trader";
+  }
+
+  if (memory.acceptedDeals >= 2) {
+    return "Deal ally";
+  }
+
+  if (memory.buyOrderSupplied + memory.buyOrderReceived >= 2) {
+    return "Supply partner";
+  }
+
+  if (memory.marketSalesAsSeller + memory.marketSalesAsBuyer >= 2) {
+    return "Market regular";
+  }
+
+  if (memory.interactionCount >= 2) {
+    return "Recurring contact";
+  }
+
+  return "Fresh contact";
+}
+
+function buildFavoriteCounterpartySummary(memory: RawCounterpartyMemory) {
+  const parts: string[] = [];
+  const marketCount = memory.marketSalesAsSeller + memory.marketSalesAsBuyer;
+  const demandCount = memory.buyOrderSupplied + memory.buyOrderReceived;
+
+  if (marketCount > 0) {
+    parts.push(`market ×${marketCount}`);
+  }
+
+  if (demandCount > 0) {
+    parts.push(`requests ×${demandCount}`);
+  }
+
+  if (memory.acceptedDeals > 0) {
+    parts.push(`deals ×${memory.acceptedDeals}`);
+  }
+
+  if (memory.recentInteractions > 0) {
+    parts.push(`${memory.recentInteractions} recent`);
+  }
+
+  return parts.join(" • ") || "Первое знакомство уже зафиксировано.";
+}
+
+function buildGuildRecurringSummary(counterparties: GuildFavoriteCounterparty[]): GuildRecurringInteractionSummary {
+  const activeCounterparties = counterparties.length;
+  const recurringCounterparties = counterparties.filter((entry) => entry.interactionCount >= 2).length;
+  const repeatBusinessCount = counterparties.reduce((sum, entry) => sum + Math.max(0, entry.interactionCount - 1), 0);
+  const crossChannelCounterparties = counterparties.filter((entry) => entry.channelCount >= 2).length;
+  const recentInteractions = counterparties.reduce((sum, entry) => sum + entry.recentInteractions, 0);
+  const favoriteCounterparty = counterparties[0] ?? null;
+  const favoriteCounterpartyLabel = favoriteCounterparty
+    ? `${favoriteCounterparty.guildName} [${favoriteCounterparty.guildTag}]`
+    : null;
+
+  return {
+    activeCounterparties,
+    recurringCounterparties,
+    repeatBusinessCount,
+    crossChannelCounterparties,
+    recentInteractions,
+    favoriteCounterpartyLabel,
+    summary:
+      activeCounterparties > 0
+        ? `${activeCounterparties} знакомых домов · ${recurringCounterparties} повторяющихся связей · ${crossChannelCounterparties} multi-channel tie.`
+        : "Пока рынок помнит только первые касания, но ещё не сформировал любимые дома.",
+    spotlight: favoriteCounterparty
+      ? `${favoriteCounterparty.guildName} [${favoriteCounterparty.guildTag}] уже считывается как ${favoriteCounterparty.relationshipLabel.toLowerCase()} и удерживает repeat-business loop живым.`
+      : "Первые повторные сделки быстро превратят анонимный рынок в сеть знакомых домов.",
+  };
+}
+
+function buildFavoriteCounterparties(input: {
+  guildId: string;
+  currentGuildTag: string | null;
+  guildDirectory: Map<string, { id: string; name: string; tag: string }>;
+  counterpartyMemories: Map<string, Map<string, RawCounterpartyMemory>>;
+}) {
+  const guildMemories = [...(input.counterpartyMemories.get(input.guildId)?.values() ?? [])]
+    .map((memory) => {
+      const counterparty = input.guildDirectory.get(memory.counterpartyGuildId) ?? null;
+
+      if (!counterparty) {
+        return null;
+      }
+
+      const channelCount = memory.channels.size;
+      const strengthScore =
+        memory.interactionCount * 7 +
+        memory.recentInteractions * 4 +
+        channelCount * 5 +
+        memory.acceptedDeals * 4 +
+        (memory.buyOrderSupplied + memory.buyOrderReceived) * 2;
+
+      return {
+        guildId: counterparty.id,
+        guildName: counterparty.name,
+        guildTag: counterparty.tag,
+        profileHref: buildGuildProfileHref(counterparty.tag),
+        marketHref: buildGuildMarketContextHref(counterparty.tag),
+        dealsHref: buildGuildDealsContextHref(counterparty.tag),
+        interactionCount: memory.interactionCount,
+        recentInteractions: memory.recentInteractions,
+        marketSalesAsSeller: memory.marketSalesAsSeller,
+        marketSalesAsBuyer: memory.marketSalesAsBuyer,
+        buyOrderSupplied: memory.buyOrderSupplied,
+        buyOrderReceived: memory.buyOrderReceived,
+        acceptedDeals: memory.acceptedDeals,
+        channelCount,
+        strengthScore,
+        relationshipLabel: buildRelationshipLabel(memory),
+        summary: buildFavoriteCounterpartySummary(memory),
+        lastInteractionAt: memory.lastInteractionAt,
+        isCurrentContext: counterparty.tag === input.currentGuildTag,
+      } satisfies GuildFavoriteCounterparty;
+    })
+    .filter((entry): entry is GuildFavoriteCounterparty => Boolean(entry))
+    .sort((left, right) => {
+      return (
+        right.strengthScore - left.strengthScore ||
+        right.interactionCount - left.interactionCount ||
+        (right.lastInteractionAt?.getTime() ?? 0) - (left.lastInteractionAt?.getTime() ?? 0) ||
+        left.guildTag.localeCompare(right.guildTag, "ru")
+      );
+    });
+
+  return {
+    all: guildMemories,
+    top: guildMemories.slice(0, 3),
+    recurringSummary: buildGuildRecurringSummary(guildMemories),
+  };
+}
+
+function buildRenownBadges(input: {
+  recurringSummary: GuildRecurringInteractionSummary;
+  favoriteCounterparties: GuildFavoriteCounterparty[];
+  score: number;
+}) {
+  const badges: GuildRenownBadge[] = [];
+  const favoriteCounterparty = input.favoriteCounterparties[0] ?? null;
+
+  if (input.recurringSummary.recurringCounterparties >= 1) {
+    badges.push({
+      key: "familiar-face",
+      label: "Familiar face",
+      description: "У гильдии уже есть повторяющиеся связи, которые делают рынок менее анонимным.",
+      tone: "success",
+    });
+  }
+
+  if (favoriteCounterparty && favoriteCounterparty.interactionCount >= 3) {
+    badges.push({
+      key: "house-favorite",
+      label: "House favorite",
+      description: `Один из домов возвращается к этой гильдии снова и снова: ${favoriteCounterparty.guildTag}.`,
+      tone: "accent",
+    });
+  }
+
+  if (input.recurringSummary.crossChannelCounterparties >= 1) {
+    badges.push({
+      key: "cross-channel-tie",
+      label: "Cross-channel tie",
+      description: "Связи не застревают в одном окне и переходят между market, request board и deals.",
+      tone: "accent",
+    });
+  }
+
+  if (input.recurringSummary.recentInteractions >= 2) {
+    badges.push({
+      key: "social-streak",
+      label: "Social streak",
+      description: "Свежие взаимодействия удерживают social memory тёплой и напоминают вернуться.",
+      tone: "success",
+    });
+  }
+
+  if (badges.length === 0 || input.score < 18) {
+    badges.unshift({
+      key: "first-impressions",
+      label: "First impressions",
+      description: "Первые знакомые имена уже появились, но retention loop ещё только собирается.",
+      tone: "warning",
+    });
+  }
+
+  return badges.slice(0, 3);
+}
+
+function buildRenownPerks(input: {
+  score: number;
+  recurringSummary: GuildRecurringInteractionSummary;
+  favoriteCounterparties: GuildFavoriteCounterparty[];
+}) {
+  const perks: GuildRenownPerk[] = [];
+  const favoriteCounterparty = input.favoriteCounterparties[0] ?? null;
+
+  if (input.score >= 18) {
+    perks.push({
+      key: "directory-spotlight",
+      label: "Directory spotlight",
+      description: "Каталог поднимает гильдию выше и объясняет, почему к ней возвращаются повторно.",
+      tone: "accent",
+    });
+  }
+
+  if (favoriteCounterparty) {
+    perks.push({
+      key: "preferred-trader-callout",
+      label: "Preferred trader callout",
+      description: `${favoriteCounterparty.guildName} [${favoriteCounterparty.guildTag}] подсвечивается как знакомый дом для мягкого возврата в market/deals.`,
+      tone: "success",
+    });
+  }
+
+  if (input.recurringSummary.recurringCounterparties >= 1) {
+    perks.push({
+      key: "social-badge",
+      label: "Social badge",
+      description: "Public profile получает заметный recurring-links badge без экономического power creep-а.",
+      tone: "accent",
+    });
+  }
+
+  if (input.recurringSummary.recentInteractions >= 2) {
+    perks.push({
+      key: "memory-recap",
+      label: "Memory recap",
+      description: "Dashboard и public profile показывают свежую серию знакомых взаимодействий как повод вернуться.",
+      tone: "success",
+    });
+  }
+
+  return perks.slice(0, 4);
+}
+
+function getRenownTier(score: number) {
+  return [...renownTierDefinitions].reverse().find((tier) => score >= tier.minScore) ?? renownTierDefinitions[0];
+}
+
+function buildRenownSpotlight(
+  contribution: GuildRenownContribution | null,
+  recurringSummary: GuildRecurringInteractionSummary,
+  favoriteCounterparties: GuildFavoriteCounterparty[],
+  tierDescription: string,
+) {
+  const favoriteCounterparty = favoriteCounterparties[0] ?? null;
+
+  if (!contribution || contribution.score <= 0) {
+    return "Первые повторные сделки быстро создадут preferred trader memory и поднимут гильдию из режима одноразовых касаний.";
+  }
+
+  if (contribution.key === "favorite-traders") {
+    return favoriteCounterparty
+      ? `${favoriteCounterparty.guildName} [${favoriteCounterparty.guildTag}] уже стала знакомым домом, а не случайной строчкой в витрине.`
+      : "Знакомые дома начинают складываться в понятный favorite traders loop.";
+  }
+
+  if (contribution.key === "repeat-business") {
+    return "Игроки уже возвращаются к этой гильдии сериями, а не разовыми покупками и офферами.";
+  }
+
+  if (contribution.key === "cross-channel-links") {
+    return "Связи мигрируют между market, request board и deals, поэтому social loop не обнуляется между экранами.";
+  }
+
+  if (contribution.key === "recent-social-memory") {
+    return recurringSummary.recentInteractions > 0
+      ? "Свежая серия знакомых взаимодействий удерживает гильдию в живой social памяти сообщества."
+      : tierDescription;
+  }
+
+  return tierDescription;
+}
+
+function buildGuildRenown(input: {
+  recurringSummary: GuildRecurringInteractionSummary;
+  favoriteCounterparties: GuildFavoriteCounterparty[];
+}) {
+  const rankingContributions = renownContributionDefinitions
+    .map((definition) => ({
+      key: definition.key,
+      label: definition.label,
+      value: definition.getValue(input),
+      score: definition.getScore(input),
+      detail: definition.getDetail(input),
+    }))
+    .sort((left, right) => right.score - left.score || right.value - left.value || left.label.localeCompare(right.label, "ru"));
+  const score = rankingContributions.reduce((sum, contribution) => sum + contribution.score, 0);
+  const tier = getRenownTier(score);
+  const leadingContribution = rankingContributions.find((contribution) => contribution.score > 0) ?? null;
+  const badges = buildRenownBadges({
+    recurringSummary: input.recurringSummary,
+    favoriteCounterparties: input.favoriteCounterparties,
+    score,
+  });
+  const perks = buildRenownPerks({
+    score,
+    recurringSummary: input.recurringSummary,
+    favoriteCounterparties: input.favoriteCounterparties,
+  });
+
+  return {
+    score,
+    rank: 0,
+    total: 0,
+    tierKey: tier.key,
+    tierLabel: tier.label,
+    descriptor: leadingContribution
+      ? `${tier.description} Главный renown-вклад идёт из слоя «${leadingContribution.label.toLowerCase()}».`
+      : tier.description,
+    summary:
+      perks.length > 0
+        ? `${tier.label} · ${perks.map((perk) => perk.label).join(" · ")}`
+        : badges.length > 0
+          ? `${tier.label} · ${badges.map((badge) => badge.label).join(" · ")}`
+          : tier.label,
+    spotlight: buildRenownSpotlight(leadingContribution, input.recurringSummary, input.favoriteCounterparties, tier.description),
+    tone: tier.tone,
+    recentInteractionCount: input.recurringSummary.recentInteractions,
+    recentInteractionLabel:
+      input.recurringSummary.recentInteractions > 0
+        ? `${input.recurringSummary.recentInteractions} свежих familiar interactions за 72 часа.`
+        : "Свежая social memory пока слабая, но первые знакомые дома уже можно собрать.",
+    recurringCounterparties: input.recurringSummary.recurringCounterparties,
+    recurringLabel:
+      input.recurringSummary.recurringCounterparties > 0
+        ? `${input.recurringSummary.recurringCounterparties} повторяющихся связей удерживают retention loop живым.`
+        : "Повторяющихся связей пока нет — каждый знакомый дом сейчас особенно ценен.",
+    favoriteCounterpartyLabel: input.recurringSummary.favoriteCounterpartyLabel,
+    primaryBadgeLabel: badges[0]?.label ?? null,
+    primaryPerkLabel: perks[0]?.label ?? null,
+    badges,
+    perks,
+    rankingContributions,
+  } satisfies GuildRenownSnapshot;
+}
+
 function buildPrestigeBadges(guild: {
   createdAt: Date;
   metrics: SocialGuildMetrics;
@@ -877,10 +1616,12 @@ function buildComputedGuild(input: {
   guild: SocialGuildRecord;
   currentGuildTag: string | null;
   locations: Array<{ code: string; name: string; requiredGuildLevel: number }>;
+  guildDirectory: Map<string, { id: string; name: string; tag: string }>;
   marketMetrics: Map<string, { active: number; sold: number; soldValue: number; recentSold: number }>;
   buyOrderBuyerMetrics: Map<string, { active: number; fulfilled: number }>;
   buyOrderSupplierMetrics: Map<string, { count: number; recent: number }>;
   ledgerMetrics: Map<string, { contracts: number; trades: number; recentContracts: number; recentTrades: number }>;
+  counterpartyMemories: Map<string, Map<string, RawCounterpartyMemory>>;
   expeditionMetrics: Map<string, {
     active: number;
     completed: number;
@@ -958,6 +1699,16 @@ function buildComputedGuild(input: {
     createdAt: input.guild.createdAt,
     metrics,
   });
+  const counterpartySnapshot = buildFavoriteCounterparties({
+    guildId: input.guild.id,
+    currentGuildTag: input.currentGuildTag,
+    guildDirectory: input.guildDirectory,
+    counterpartyMemories: input.counterpartyMemories,
+  });
+  const renown = buildGuildRenown({
+    recurringSummary: counterpartySnapshot.recurringSummary,
+    favoriteCounterparties: counterpartySnapshot.top,
+  });
 
   return {
     id: input.guild.id,
@@ -975,8 +1726,14 @@ function buildComputedGuild(input: {
     heroes: input.guild.heroes,
     metrics,
     reputation,
+    renown,
+    recurringSummary: counterpartySnapshot.recurringSummary,
+    favoriteCounterparties: counterpartySnapshot.top,
     pveLabel: `${pveMetrics.unlockedLocationCount}/${pveMetrics.totalLocationCount} зон · ${pveMetrics.highestUnlockedRiskLabel}`,
-    socialSummary: `${reputation.summary}. ${reputation.spotlight}`,
+    socialSummary:
+      counterpartySnapshot.recurringSummary.favoriteCounterpartyLabel
+        ? `${renown.summary}. Любимый дом: ${counterpartySnapshot.recurringSummary.favoriteCounterpartyLabel}. ${renown.spotlight}`
+        : `${renown.summary}. ${renown.spotlight}`,
     profileHref: buildGuildProfileHref(input.guild.tag),
     marketHref: buildGuildMarketContextHref(input.guild.tag),
     dealsHref: buildGuildDealsContextHref(input.guild.tag),
@@ -995,6 +1752,12 @@ function rankGuilds(
       return metricDelta;
     }
 
+    const renownDelta = right.renown.score - left.renown.score;
+
+    if (renownDelta !== 0) {
+      return renownDelta;
+    }
+
     const reputationDelta = right.reputation.score - left.reputation.score;
 
     if (reputationDelta !== 0) {
@@ -1006,7 +1769,7 @@ function rankGuilds(
 }
 
 async function loadComputedGuilds(currentGuildTag: string | null) {
-  const [locations, guilds, marketRows, buyOrderRows, ledgerRows, expeditionRows] = await Promise.all([
+  const [locations, guilds, marketRows, buyOrderRows, tradeOfferRows, ledgerRows, expeditionRows] = await Promise.all([
     prisma.location.findMany({
       where: { isEnabled: true },
       orderBy: { requiredGuildLevel: "asc" },
@@ -1023,6 +1786,7 @@ async function loadComputedGuilds(currentGuildTag: string | null) {
     prisma.marketListing.findMany({
       select: {
         sellerGuildId: true,
+        buyerGuildId: true,
         status: true,
         totalPriceGold: true,
         soldAt: true,
@@ -1034,6 +1798,16 @@ async function loadComputedGuilds(currentGuildTag: string | null) {
         fulfillerGuildId: true,
         status: true,
         fulfilledAt: true,
+      },
+    }),
+    prisma.tradeOffer.findMany({
+      where: { status: TradeOfferStatus.ACCEPTED },
+      select: {
+        senderGuildId: true,
+        receiverGuildId: true,
+        status: true,
+        createdAt: true,
+        respondedAt: true,
       },
     }),
     prisma.economyLedgerEntry.findMany({
@@ -1065,9 +1839,15 @@ async function loadComputedGuilds(currentGuildTag: string | null) {
     }),
   ]);
 
+  const guildDirectory = new Map(guilds.map((guild) => [guild.id, { id: guild.id, name: guild.name, tag: guild.tag }]));
   const marketMetrics = buildMarketMetrics(marketRows);
   const buyOrderBuyerMetrics = buildBuyOrderBuyerMetrics(buyOrderRows);
   const buyOrderSupplierMetrics = buildBuyOrderSupplierMetrics(buyOrderRows);
+  const counterpartyMemories = buildCounterpartyMemories({
+    marketRows,
+    buyOrderRows,
+    tradeOfferRows,
+  });
   const ledgerMetrics = buildLedgerMetrics(ledgerRows);
   const expeditionMetrics = buildExpeditionMetrics(expeditionRows);
   const computedGuilds = guilds.map((guild) =>
@@ -1075,25 +1855,42 @@ async function loadComputedGuilds(currentGuildTag: string | null) {
       guild,
       currentGuildTag,
       locations,
+      guildDirectory,
       marketMetrics,
       buyOrderBuyerMetrics,
       buyOrderSupplierMetrics,
       ledgerMetrics,
+      counterpartyMemories,
       expeditionMetrics,
     }),
   );
-  const prestigeRankedGuilds = [...computedGuilds].sort((left, right) => {
+  const renownRankedGuilds = [...computedGuilds].sort((left, right) => {
     return (
+      right.renown.score - left.renown.score ||
       right.reputation.score - left.reputation.score ||
       right.metrics.power - left.metrics.power ||
       left.tag.localeCompare(right.tag, "ru")
     );
   });
+  const prestigeRankedGuilds = [...computedGuilds].sort((left, right) => {
+    return (
+      right.reputation.score - left.reputation.score ||
+      right.renown.score - left.renown.score ||
+      right.metrics.power - left.metrics.power ||
+      left.tag.localeCompare(right.tag, "ru")
+    );
+  });
   const total = prestigeRankedGuilds.length;
+  const renownRanks = new Map(renownRankedGuilds.map((guild, index) => [guild.id, index + 1]));
   const prestigeRanks = new Map(prestigeRankedGuilds.map((guild, index) => [guild.id, index + 1]));
 
   return computedGuilds.map((guild) => ({
     ...guild,
+    renown: {
+      ...guild.renown,
+      rank: renownRanks.get(guild.id) ?? total,
+      total,
+    },
     reputation: {
       ...guild.reputation,
       rank: prestigeRanks.get(guild.id) ?? total,
@@ -1123,7 +1920,10 @@ function buildLeaderboards(guilds: SocialComputedGuild[]) {
         href: guild.profileHref,
         isCurrentContext: guild.isCurrentContext,
         tierLabel: guild.reputation.tierLabel,
+        renownTierLabel: guild.renown.tierLabel,
         primaryBadgeLabel: guild.reputation.primaryBadgeLabel,
+        primaryRenownPerkLabel: guild.renown.primaryPerkLabel,
+        favoriteCounterpartyLabel: guild.renown.favoriteCounterpartyLabel,
       })),
     } satisfies GuildLeaderboardSnapshot;
   });
@@ -1218,6 +2018,26 @@ function mapToPrestigeSummary(guild: SocialComputedGuild): GuildPrestigeSummary 
     marketHref: guild.marketHref,
     dealsHref: guild.dealsHref,
     isCurrentContext: guild.isCurrentContext,
+    renown: {
+      score: guild.renown.score,
+      rank: guild.renown.rank,
+      total: guild.renown.total,
+      tierKey: guild.renown.tierKey,
+      tierLabel: guild.renown.tierLabel,
+      descriptor: guild.renown.descriptor,
+      summary: guild.renown.summary,
+      spotlight: guild.renown.spotlight,
+      tone: guild.renown.tone,
+      recentInteractionCount: guild.renown.recentInteractionCount,
+      recentInteractionLabel: guild.renown.recentInteractionLabel,
+      recurringCounterparties: guild.renown.recurringCounterparties,
+      recurringLabel: guild.renown.recurringLabel,
+      favoriteCounterpartyLabel: guild.renown.favoriteCounterpartyLabel,
+      primaryBadgeLabel: guild.renown.primaryBadgeLabel,
+      primaryPerkLabel: guild.renown.primaryPerkLabel,
+      badges: guild.renown.badges,
+      perks: guild.renown.perks,
+    },
     prestige: {
       score: guild.reputation.score,
       rank: guild.reputation.rank,
@@ -1233,6 +2053,8 @@ function mapToPrestigeSummary(guild: SocialComputedGuild): GuildPrestigeSummary 
       primaryBadgeLabel: guild.reputation.primaryBadgeLabel,
       badges: guild.reputation.badges,
     },
+    recurringSummary: guild.recurringSummary,
+    favoriteCounterparties: guild.favoriteCounterparties,
   };
 }
 
@@ -1242,6 +2064,7 @@ export async function loadGuildPrestigeSummaries(currentGuildTag: string | null)
   return guilds
     .sort((left, right) => {
       return (
+        right.renown.score - left.renown.score ||
         right.reputation.score - left.reputation.score ||
         right.level - left.level ||
         right.metrics.power - left.metrics.power ||
@@ -1273,11 +2096,19 @@ export async function loadGuildDirectoryPageData(): Promise<GuildDirectoryPageDa
       contractsClaimed: guilds.reduce((sum, guild) => sum + guild.metrics.contractsCompleted, 0),
       resolvedExpeditions: guilds.reduce((sum, guild) => sum + guild.metrics.completedExpeditions, 0),
       prestigeLeaders: guilds.filter((guild) => guild.reputation.score >= 45).length,
+      renownLeaders: guilds.filter((guild) => guild.renown.score >= 36).length,
       recentTrustActions: guilds.reduce((sum, guild) => sum + guild.metrics.recentTrustActions, 0),
+      recurringPairs: guilds.reduce((sum, guild) => sum + guild.recurringSummary.recurringCounterparties, 0),
     },
     leaderboards,
     guilds: [...guilds]
       .sort((left, right) => {
+        const renownDelta = right.renown.score - left.renown.score;
+
+        if (renownDelta !== 0) {
+          return renownDelta;
+        }
+
         const prestigeDelta = right.reputation.score - left.reputation.score;
 
         if (prestigeDelta !== 0) {
@@ -1292,6 +2123,7 @@ export async function loadGuildDirectoryPageData(): Promise<GuildDirectoryPageDa
         guildTag: guild.tag,
         ownerDisplayName: guild.ownerDisplayName,
         prestige: guild.reputation,
+        renown: guild.renown,
         level: guild.level,
         gold: guild.gold,
         rosterPower: guild.metrics.power,
@@ -1305,6 +2137,8 @@ export async function loadGuildDirectoryPageData(): Promise<GuildDirectoryPageDa
         completedExpeditions: guild.metrics.completedExpeditions,
         pveLabel: guild.pveLabel,
         socialSummary: guild.socialSummary,
+        favoriteCounterparties: guild.favoriteCounterparties,
+        recurringSummary: guild.recurringSummary,
         profileHref: guild.profileHref,
         marketHref: guild.marketHref,
         dealsHref: guild.dealsHref,
@@ -1313,6 +2147,7 @@ export async function loadGuildDirectoryPageData(): Promise<GuildDirectoryPageDa
     players: [...guilds]
       .sort((left, right) => {
         return (
+          right.renown.score - left.renown.score ||
           right.reputation.score - left.reputation.score ||
           right.metrics.power - left.metrics.power ||
           left.ownerDisplayName.localeCompare(right.ownerDisplayName, "ru")
@@ -1324,6 +2159,7 @@ export async function loadGuildDirectoryPageData(): Promise<GuildDirectoryPageDa
         guildName: guild.name,
         guildTag: guild.tag,
         prestige: guild.reputation,
+        renown: guild.renown,
         guildLevel: guild.level,
         rosterPower: guild.metrics.power,
         marketActivity: guild.metrics.market,
@@ -1546,6 +2382,7 @@ export async function loadGuildPublicProfilePageData(
         at: listing.soldAt ?? new Date(0),
         href: "/market",
         tone: "success" as const,
+        counterpartyGuildTag: listing.buyerGuild?.tag ?? null,
       };
     }),
     ...fulfilledOrders.map((order) => ({
@@ -1558,6 +2395,7 @@ export async function loadGuildPublicProfilePageData(
       at: order.fulfilledAt ?? new Date(0),
       href: "/market",
       tone: "success" as const,
+      counterpartyGuildTag: order.buyerGuild.tag,
     })),
     ...recentLedgerEntries.map((entry) => {
       const counterparty = entry.counterpartyGuildId ? counterpartyMap.get(entry.counterpartyGuildId) ?? null : null;
@@ -1582,6 +2420,7 @@ export async function loadGuildPublicProfilePageData(
           at: entry.createdAt,
           href: "/deals",
           tone: "success" as const,
+          counterpartyGuildTag: counterparty?.tag ?? null,
         };
       }
 
@@ -1595,6 +2434,7 @@ export async function loadGuildPublicProfilePageData(
         at: entry.createdAt,
         href: "/dashboard",
         tone: "accent" as const,
+        counterpartyGuildTag: counterparty?.tag ?? null,
       };
     }),
     ...recentExpeditions
@@ -1617,6 +2457,7 @@ export async function loadGuildPublicProfilePageData(
         at: expedition.claimedAt ?? expedition.resolvedAt ?? new Date(0),
         href: "/expedition",
         tone: expedition.resultTier === ExpeditionResultTier.TRIUMPH ? "accent" as const : "success" as const,
+        counterpartyGuildTag: null,
       })),
   ]
     .filter((entry) => entry.at.getTime() > 0)
@@ -1655,6 +2496,7 @@ export async function loadGuildPublicProfilePageData(
       isCurrentContext: computedGuild.isCurrentContext,
     },
     prestige: computedGuild.reputation,
+    renown: computedGuild.renown,
     leaderboardPlacements: buildLeaderboardPlacements(guilds, computedGuild.id),
     featuredHeroes: guildDetail.heroes.map((hero) => ({
       id: hero.id,
@@ -1689,6 +2531,19 @@ export async function loadGuildPublicProfilePageData(
       expiresAt: order.expiresAt,
     })),
     recentActivity: trustActivity,
+    socialMemory: trustActivity.map((entry) => ({
+      id: entry.id,
+      sourceLabel: entry.sourceLabel,
+      title: entry.title,
+      summary: entry.summary,
+      detail: entry.detail,
+      at: entry.at,
+      href: entry.href,
+      tone: entry.tone,
+      counterpartyGuildTag: entry.counterpartyGuildTag,
+    })),
+    favoriteTraders: computedGuild.favoriteCounterparties,
+    recurringSummary: computedGuild.recurringSummary,
     socialCtas: {
       directoryHref: "/guilds",
       marketHref: buildGuildMarketContextHref(computedGuild.tag),

@@ -81,6 +81,12 @@ export default async function DealsPage({
         </Notice>
       ) : null}
 
+      {data.guildPrestige ? (
+        <Notice tone={data.guildPrestige.renown.tone}>
+          <strong>{data.guildPrestige.renown.tierLabel}.</strong> {data.guildPrestige.renown.spotlight}
+        </Notice>
+      ) : null}
+
       {data.prefillReceiverLabel ? (
         <Notice tone="success">
           Social CTA подхватил публичную гильдию {data.prefillReceiverLabel}: форма ниже уже готова к
@@ -92,8 +98,42 @@ export default async function DealsPage({
         <InfoCard title="Trade access" value={data.tradeUnlocked ? "Open" : "Locked"} detail="Trade unlock уже хранится в активной гильдии." tone="accent" />
         <InfoCard title="Pending incoming" value={data.pendingIncoming.length} detail="Те офферы, на которые активная гильдия может ответить прямо сейчас." />
         <InfoCard title="Pending outgoing" value={data.pendingOutgoing.length} detail="Ваши исходящие офферы, которые всё ещё ждут ответа." />
-        <InfoCard title="Resolved history" value={data.resolvedOffers.length} detail="Accepted / rejected / cancelled / expired outcomes видны как отдельная история." tone="success" />
+        <InfoCard title="Resolved history" value={data.resolvedOffers.length} detail={data.guildPrestige ? `${data.guildPrestige.renown.recurringLabel} ${data.guildPrestige.renown.favoriteCounterpartyLabel ? `Favorite trader: ${data.guildPrestige.renown.favoriteCounterpartyLabel}.` : ""}` : "Accepted / rejected / cancelled / expired outcomes видны как отдельная история."} tone="success" />
       </div>
+
+      {data.guildPrestige?.favoriteCounterparties.length ? (
+        <SectionCard
+          title="Favorite traders for private deals"
+          description="Здесь сначала вспоминаются знакомые дома, с которыми уже сложилась социальная история. Это превращает deals в серию отношений, а не в одноразовый barter."
+          aside={<Pill tone={data.guildPrestige.renown.tone}>{data.guildPrestige.renown.tierLabel}</Pill>}
+        >
+          <div className="stack-sm">
+            {data.guildPrestige.favoriteCounterparties.map((counterparty) => (
+              <article key={counterparty.guildId} className="row-card">
+                <div>
+                  <div className="row-card__title">
+                    {counterparty.guildName} [{counterparty.guildTag}]
+                  </div>
+                  <p className="row-card__description">
+                    {counterparty.relationshipLabel} · {counterparty.summary}
+                    <br />
+                    {counterparty.interactionCount} interactions · deals {counterparty.acceptedDeals} · requests {counterparty.buyOrderSupplied + counterparty.buyOrderReceived}
+                  </p>
+                </div>
+                <div className="row-card__aside">
+                  <Pill tone={counterparty.isCurrentContext ? "success" : "accent"}>{counterparty.relationshipLabel}</Pill>
+                  <Link className="button button--ghost" href={counterparty.profileHref}>
+                    Профиль
+                  </Link>
+                  <Link className="button button--ghost" href={counterparty.marketHref}>
+                    Market CTA
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        </SectionCard>
+      ) : null}
 
       <div className="content-grid content-grid--two-thirds">
         <SectionCard title="Создать новый оффер" description="Заполните только один блок отдачи и один блок запроса: предмет или ресурс с количеством.">
@@ -107,6 +147,8 @@ export default async function DealsPage({
                   <option key={counterparty.guildTag} value={counterparty.guildTag}>
                     {counterparty.label}
                     {counterparty.prestige ? ` · ${counterparty.prestige.tierLabel}` : ""}
+                    {counterparty.renown ? ` · ${counterparty.renown.tierLabel}` : ""}
+                    {counterparty.isFavoriteTrader ? ` · ${counterparty.relationshipLabel ?? "Favorite trader"}` : ""}
                   </option>
                 ))}
               </select>
@@ -193,6 +235,7 @@ export default async function DealsPage({
                   </div>
                   <div className="row-card__aside">
                     <Pill tone={offer.tone}>{offer.outcomeLabel}</Pill>
+                    {data.counterparties.find((entry) => entry.label === offer.counterpartyLabel)?.isFavoriteTrader ? <Pill tone="success">Known house</Pill> : null}
                     <span className="muted">Создана: {formatDateTime(offer.createdAt)}</span>
                     <span className="muted">До {formatDateTime(offer.expiresAt)}</span>
                     <div className="actions-inline">
@@ -239,6 +282,7 @@ export default async function DealsPage({
                   </div>
                   <div className="row-card__aside">
                     <Pill tone={offer.tone}>{offer.outcomeLabel}</Pill>
+                    {data.counterparties.find((entry) => entry.label === offer.counterpartyLabel)?.isFavoriteTrader ? <Pill tone="success">Favorite trader</Pill> : null}
                     <span className="muted">Создана: {formatDateTime(offer.createdAt)}</span>
                     <span className="muted">До {formatDateTime(offer.expiresAt)}</span>
                     <form action={cancelTradeOffer} className="inline-form">
@@ -282,9 +326,10 @@ export default async function DealsPage({
                     ) : null}
                   </p>
                 </div>
-                <div className="row-card__aside">
-                  <Pill tone={offer.tone}>{offer.outcomeLabel}</Pill>
-                  <span className="muted">Создана: {formatDateTime(offer.createdAt)}</span>
+                  <div className="row-card__aside">
+                    <Pill tone={offer.tone}>{offer.outcomeLabel}</Pill>
+                    {data.counterparties.find((entry) => entry.label === offer.counterpartyLabel)?.isFavoriteTrader ? <Pill tone="success">Memory kept</Pill> : null}
+                    <span className="muted">Создана: {formatDateTime(offer.createdAt)}</span>
                   <span className="muted">
                     {offer.respondedAt ? `Закрыта: ${formatDateTime(offer.respondedAt)}` : `Истекла: ${formatDateTime(offer.expiresAt)}`}
                   </span>

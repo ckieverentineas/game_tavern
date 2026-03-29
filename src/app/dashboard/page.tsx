@@ -128,6 +128,13 @@ export default async function DashboardPage({
         </Notice>
       ) : null}
 
+      {data.guildPrestige ? (
+        <Notice tone={data.guildPrestige.renown.tone}>
+          <strong>{data.guildPrestige.renown.tierLabel}.</strong> {data.guildPrestige.renown.spotlight}
+          {data.guildPrestige.renown.favoriteCounterpartyLabel ? ` Любимый дом сейчас: ${data.guildPrestige.renown.favoriteCounterpartyLabel}.` : ""}
+        </Notice>
+      ) : null}
+
       <Notice tone="accent">
         <strong>{worldEventBoard.season.label}.</strong> {worldEventBoard.season.summary} Сейчас видно
         {` ${worldEventBoard.summary.claimableRewardCount} готовых reward-claim, ${worldEventBoard.summary.nearGoalCount} близких tier-целей и ${worldEventBoard.summary.recentActivityCount} публичных сигналов активности.`}
@@ -256,6 +263,14 @@ export default async function DashboardPage({
       </SectionCard>
 
       <div className="stats-grid stats-grid--4">
+        {data.guildPrestige ? (
+          <InfoCard
+            title="Renown"
+            value={data.guildPrestige.renown.score}
+            detail={`#${data.guildPrestige.renown.rank} из ${data.guildPrestige.renown.total} · ${data.guildPrestige.renown.recurringLabel}`}
+            tone={data.guildPrestige.renown.tone}
+          />
+        ) : null}
         {data.guildPrestige ? (
           <InfoCard
             title="Prestige"

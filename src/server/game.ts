@@ -1239,6 +1239,10 @@ export type MarketPageData = {
     activeListingsCount: number;
     activeBuyOrdersCount: number;
     prestige: GuildPrestigeSummary["prestige"] | null;
+    renown: GuildPrestigeSummary["renown"] | null;
+    recurringSummary: GuildPrestigeSummary["recurringSummary"] | null;
+    favoriteCounterparties: GuildPrestigeSummary["favoriteCounterparties"];
+    relationshipLabel: string | null;
     profileHref: string;
     dealsHref: string;
   } | null;
@@ -1282,6 +1286,9 @@ export type DealsPageData = {
     guildTag: string;
     label: string;
     prestige: GuildPrestigeSummary["prestige"] | null;
+    renown: GuildPrestigeSummary["renown"] | null;
+    relationshipLabel: string | null;
+    isFavoriteTrader: boolean;
   }>;
   offerableItems: Array<{
     id: string;
@@ -6532,8 +6539,8 @@ export async function getMarketPageData(
         }),
       ]);
     const guildPrestige = prestigeSummaries.find((entry) => entry.guildTag === freshGuild.tag) ?? null;
-    const highlightedGuildPrestige = highlightedGuild
-      ? prestigeSummaries.find((entry) => entry.guildTag === highlightedGuild.tag)?.prestige ?? null
+    const highlightedGuildSummary = highlightedGuild
+      ? prestigeSummaries.find((entry) => entry.guildTag === highlightedGuild.tag) ?? null
       : null;
 
     const sellableItemLabels = sellableItems
@@ -6565,7 +6572,12 @@ export async function getMarketPageData(
         activeBuyOrdersCount: activeBuyOrderViews.filter(
           (order) => order.buyerGuildTag === highlightedGuild.tag,
         ).length,
-        prestige: highlightedGuildPrestige,
+        prestige: highlightedGuildSummary?.prestige ?? null,
+        renown: highlightedGuildSummary?.renown ?? null,
+        recurringSummary: highlightedGuildSummary?.recurringSummary ?? null,
+        favoriteCounterparties: highlightedGuildSummary?.favoriteCounterparties ?? [],
+        relationshipLabel:
+          guildPrestige?.favoriteCounterparties.find((entry) => entry.guildTag === highlightedGuild.tag)?.relationshipLabel ?? null,
         profileHref: `/guilds/${encodeURIComponent(highlightedGuild.tag)}`,
         dealsHref: `/deals?to=${encodeURIComponent(highlightedGuild.tag)}`,
       }
@@ -6737,6 +6749,7 @@ export async function getDealsPageData(
     const prefillCounterparty = normalizedPrefillReceiverGuildTag
       ? counterparties.find((counterparty) => counterparty.tag === normalizedPrefillReceiverGuildTag) ?? null
       : null;
+    const favoriteTraderTags = new Set(guildPrestige?.favoriteCounterparties.map((entry) => entry.guildTag) ?? []);
     const orderedCounterparties = [...counterparties].sort((left, right) => {
       if (prefillCounterparty?.tag === left.tag) {
         return -1;
@@ -6745,6 +6758,13 @@ export async function getDealsPageData(
       if (prefillCounterparty?.tag === right.tag) {
         return 1;
       }
+
+       const leftFavorite = favoriteTraderTags.has(left.tag);
+       const rightFavorite = favoriteTraderTags.has(right.tag);
+
+       if (leftFavorite !== rightFavorite) {
+         return leftFavorite ? -1 : 1;
+       }
 
       return left.tag.localeCompare(right.tag, "ru");
     });
@@ -6768,6 +6788,12 @@ export async function getDealsPageData(
         guildTag: counterparty.tag,
         label: `${counterparty.name} [${counterparty.tag}]`,
         prestige: prestigeSummaries.find((entry) => entry.guildTag === counterparty.tag)?.prestige ?? null,
+        renown: prestigeSummaries.find((entry) => entry.guildTag === counterparty.tag)?.renown ?? null,
+        relationshipLabel:
+          guildPrestige?.favoriteCounterparties.find((entry) => entry.guildTag === counterparty.tag)?.relationshipLabel ?? null,
+        isFavoriteTrader: Boolean(
+          guildPrestige?.favoriteCounterparties.some((entry) => entry.guildTag === counterparty.tag),
+        ),
       })),
       offerableItems: offerableItems.map((item) => ({
         id: item.id,

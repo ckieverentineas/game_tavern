@@ -43,16 +43,18 @@ npm run dev
 - `/guilds` показывает:
   - публичный каталог гильдий
   - каталог игроков по owner/display name
+  - renown-aware сортировку с recurring links, favorite traders и familiar-house highlight-ами
   - лидерборды по guild level, wealth, roster power и market activity
   - seasonal world event board с общими целями, standings и claimable rewards
 - `/guilds/[guildTag]` показывает полезный public profile:
   - гильдию, tag, owner/display name
   - progression snapshot, power, wealth, PvE status и часть ростера
+  - favorite traders, recurring interaction summary, renown perks/badges и recent social memory
   - live market / buy-order витрину и recent public activity
   - seasonal status по событиям frontier / market / forge
   - social CTA в `/market?guild=TAG` и `/deals?to=TAG`
-- Dashboard, `/expedition` и `/market` теперь отдельно объясняют, как текущие действия двигают world events и какие rewards уже можно забрать.
-- Seed теперь поднимает не только managed demo-гильдии для sandbox switching, но и дополнительные публичные seasonal claims, чтобы directory, event standings и leaderboard-слой выглядели живыми сразу после [`npm run db:setup`](package.json:19)
+- Dashboard, `/market` и `/deals` теперь отдельно подсвечивают favorite traders, recurring ties и preferred-trader callout-ы как мягкий retention hook.
+- Seed теперь поднимает не только managed demo-гильдии для sandbox switching, но и разные renown states, favorite traders и social history между несколькими домами, чтобы directory, event standings и social memory-слой выглядели живыми сразу после [`npm run db:setup`](package.json:19)
 
 ## Проверки
 

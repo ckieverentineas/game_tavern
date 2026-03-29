@@ -31,8 +31,8 @@ export default async function GuildDirectoryPage() {
     <div className="page-stack">
       <PageHeader
         eyebrow="Guild directory"
-        title="Публичные гильдии, prestige и social leaderboard-слой"
-        description="Теперь каталог показывает не только силу и богатство, но и репутацию: какие гильдии приятнее как контрагенты, кто закрывает спрос, кто держит frontier prestige и почему с ними хочется взаимодействовать."
+        title="Публичные гильдии, renown loop и social leaderboard-слой"
+        description="Каталог теперь показывает не только силу и богатство, но и повторную social ценность: какие гильдии собирают familiar-house renown, кто возвращает к себе контрагентов сериями и где уже появились любимые дома мира."
         actions={
           <>
             <Link className="button button--primary" href="/market">
@@ -46,7 +46,7 @@ export default async function GuildDirectoryPage() {
       />
 
       <Notice tone="accent">
-        Reputation / prestige собирается поверх уже существующих данных экономики, deals, контрактов и PvE: без тяжёлого нового backend-а, но с понятной social visibility, статусом и причинами реально играть «красиво».
+        Renown и social memory собираются поверх уже существующих market sales, fulfilled buy orders, accepted deals, контрактов и PvE: без тяжёлого нового backend-а, но с понятной social visibility и причинами возвращаться не в пустой рынок, а к знакомым домам.
       </Notice>
 
       <Notice tone="success">
@@ -67,15 +67,15 @@ export default async function GuildDirectoryPage() {
           detail="Каталог игроков derived из owner/display name уже существующих аккаунтов."
         />
         <InfoCard
-          title="Prestige leaders"
-          value={data.community.prestigeLeaders}
-          detail={`${data.community.recentTrustActions} trust-building activites за последние 72 часа поддерживают status layer живым.`}
+          title="Renown leaders"
+          value={data.community.renownLeaders}
+          detail={`${data.community.recurringPairs} recurring ties уже делают рынок менее анонимным.`}
           tone="success"
         />
         <InfoCard
           title="Progress surfaced"
           value={`${data.community.contractsClaimed} / ${data.community.resolvedExpeditions}`}
-          detail={`Контракты, high-risk clears и social loops получают публично читаемый prestige вместо чисто декоративной цифры.`}
+          detail={`Контракты, high-risk clears и repeat-business серии получают публично читаемый status вместо чисто декоративной цифры.`}
         />
         <InfoCard
           title="Seasonal rewards"
@@ -157,13 +157,17 @@ export default async function GuildDirectoryPage() {
                       <br />
                       {entry.valueLabel}
                       <br />
-                      {entry.tierLabel}
+                      {entry.renownTierLabel} · {entry.tierLabel}
+                      {entry.primaryRenownPerkLabel ? ` · ${entry.primaryRenownPerkLabel}` : ""}
                       {entry.primaryBadgeLabel ? ` · ${entry.primaryBadgeLabel}` : ""}
+                      <br />
+                      {entry.favoriteCounterpartyLabel ? `Favorite trader: ${entry.favoriteCounterpartyLabel}` : "Пока любимые дома ещё не собраны."}
                       <br />
                       {entry.detail}
                     </p>
                   </div>
                   <div className="row-card__aside">
+                    {entry.primaryRenownPerkLabel ? <Pill tone="success">{entry.primaryRenownPerkLabel}</Pill> : null}
                     {entry.primaryBadgeLabel ? <Pill tone="accent">{entry.primaryBadgeLabel}</Pill> : null}
                     <Pill tone={entry.isCurrentContext ? "success" : entry.rank === 1 ? "accent" : "neutral"}>
                       {entry.isCurrentContext ? "Текущий контекст" : entry.rank === 1 ? "Лидер" : `Top ${entry.rank}`}
@@ -193,6 +197,8 @@ export default async function GuildDirectoryPage() {
                 <p className="row-card__description">
                   Owner: {guild.ownerDisplayName}
                   <br />
+                  {guild.renown.tierLabel} · {guild.renown.score} renown · rank #{guild.renown.rank}/{guild.renown.total}
+                  <br />
                   {guild.prestige.tierLabel} · {guild.prestige.score} prestige · rank #{guild.prestige.rank}/{guild.prestige.total}
                   <br />
                   Lv. {guild.level} · {formatNumber(guild.gold)} зол. · {formatNumber(guild.rosterPower)} power · {guild.heroCount} героев
@@ -201,12 +207,20 @@ export default async function GuildDirectoryPage() {
                   <br />
                   {guild.pveLabel} · deals {guild.privateDealsCompleted} · contracts {guild.contractsCompleted}
                   <br />
+                  {guild.recurringSummary.summary}
+                  <br />
+                  {guild.renown.favoriteCounterpartyLabel
+                    ? `Favorite traders: ${guild.favoriteCounterparties.map((entry) => `${entry.guildTag} (${entry.relationshipLabel})`).join(" • ")}`
+                    : "Пока любимые дома не собрались — первая серия повторных сделок быстро включит social memory."}
+                  <br />
                   {guild.socialSummary}
                   <br />
-                  {guild.prestige.recentTrustLabel}
+                  {guild.renown.recentInteractionLabel}
                 </p>
               </div>
               <div className="row-card__aside">
+                <Pill tone={guild.renown.tone}>{guild.renown.tierLabel}</Pill>
+                {guild.renown.primaryPerkLabel ? <Pill tone="success">{guild.renown.primaryPerkLabel}</Pill> : null}
                 <Pill tone={guild.prestige.tone}>{guild.prestige.tierLabel}</Pill>
                 {guild.prestige.primaryBadgeLabel ? <Pill tone="accent">{guild.prestige.primaryBadgeLabel}</Pill> : null}
                 <Pill tone={guild.isCurrentContext ? "success" : "accent"}>
@@ -239,6 +253,9 @@ export default async function GuildDirectoryPage() {
                 <p className="row-card__description">
                   {player.guildName} [{player.guildTag}]
                   <br />
+                  {player.renown.tierLabel} · {player.renown.score} renown
+                  {player.renown.primaryPerkLabel ? ` · ${player.renown.primaryPerkLabel}` : ""}
+                  <br />
                   {player.prestige.tierLabel} · {player.prestige.score} prestige
                   {player.prestige.primaryBadgeLabel ? ` · ${player.prestige.primaryBadgeLabel}` : ""}
                   <br />
@@ -250,7 +267,8 @@ export default async function GuildDirectoryPage() {
                 </p>
               </div>
               <div className="row-card__aside">
-                <Pill tone={player.prestige.tone}>{player.prestige.tierLabel}</Pill>
+                <Pill tone={player.renown.tone}>{player.renown.tierLabel}</Pill>
+                {player.renown.primaryPerkLabel ? <Pill tone="success">{player.renown.primaryPerkLabel}</Pill> : null}
                 <Pill tone={player.isCurrentContext ? "success" : "neutral"}>
                   {player.isCurrentContext ? "Это вы" : "Игрок visible"}
                 </Pill>

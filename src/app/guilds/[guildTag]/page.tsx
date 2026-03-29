@@ -37,7 +37,7 @@ export default async function GuildPublicProfilePage({
       <PageHeader
         eyebrow="Guild profile"
         title={`${data.guild.name} [${data.guild.tag}]`}
-        description="Публичная prestige-витрина гильдии: owner, status tier, trusted badges, ranking contributions, часть ростера и мягкие CTA в уже существующие loops взаимодействия."
+        description="Публичная social-memory витрина гильдии: owner, renown/perstige tiers, favorite traders, recurring links, badges/perks, часть ростера и мягкие CTA в уже существующие loops взаимодействия."
         actions={
           <>
             <Link className="button button--primary" href={data.socialCtas.marketHref}>
@@ -63,12 +63,22 @@ export default async function GuildPublicProfilePage({
         <strong>{data.prestige.tierLabel}.</strong> {data.prestige.spotlight}
       </Notice>
 
+      <Notice tone={data.renown.tone}>
+        <strong>{data.renown.tierLabel}.</strong> {data.renown.spotlight}
+      </Notice>
+
       <Notice tone="accent">
         <strong>{data.worldEventBoard.season.label}.</strong> Профиль теперь показывает не только prestige-историю,
         но и текущий seasonal status этой гильдии в глобальных world events.
       </Notice>
 
       <div className="stats-grid stats-grid--4">
+        <InfoCard
+          title="Renown"
+          value={`${data.renown.score}`}
+          detail={`#${data.renown.rank} из ${data.renown.total} · ${data.renown.recurringLabel}`}
+          tone={data.renown.tone}
+        />
         <InfoCard
           title="Prestige"
           value={`${data.prestige.score}`}
@@ -103,6 +113,56 @@ export default async function GuildPublicProfilePage({
 
       <div className="content-grid content-grid--two-thirds">
         <SectionCard
+          title="Renown / retention loop"
+          description="Renown не про raw power, а про повторные связи: familiar houses, preferred trader callouts, social badges и memory recap без лома баланса."
+          aside={<Pill tone={data.renown.tone}>{data.renown.tierLabel}</Pill>}
+        >
+          <div className="stack-sm">
+            <article className="row-card">
+              <div>
+                <div className="row-card__title">Recurring interaction summary</div>
+                <p className="row-card__description">
+                  {data.recurringSummary.summary}
+                  <br />
+                  {data.recurringSummary.spotlight}
+                  <br />
+                  {data.renown.recentInteractionLabel}
+                  <br />
+                  {data.renown.favoriteCounterpartyLabel ?? "Любимые дома ещё собираются."}
+                </p>
+              </div>
+              <div className="row-card__aside">
+                {data.renown.perks.map((perk) => (
+                  <Pill key={perk.key} tone={perk.tone}>{perk.label}</Pill>
+                ))}
+                {data.renown.badges.map((badge) => (
+                  <Pill key={badge.key} tone={badge.tone}>{badge.label}</Pill>
+                ))}
+              </div>
+            </article>
+            {data.renown.rankingContributions.map((contribution) => (
+              <article key={contribution.key} className="row-card">
+                <div>
+                  <div className="row-card__title">{contribution.label}</div>
+                  <p className="row-card__description">
+                    Score +{contribution.score}
+                    <br />
+                    Value: {contribution.value}
+                    <br />
+                    {contribution.detail}
+                  </p>
+                </div>
+                <div className="row-card__aside">
+                  <Pill tone={contribution.score > 0 ? "success" : "neutral"}>
+                    {contribution.score > 0 ? `+${contribution.score}` : "0"}
+                  </Pill>
+                </div>
+              </article>
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard
           title="Social identity snapshot"
           description="Профиль не декоративный: он объясняет, кто владеет гильдией, почему ей доверяют и где именно она набирает social prestige."
           aside={<Pill tone={data.prestige.tone}>{data.prestige.tierLabel}</Pill>}
@@ -136,6 +196,46 @@ export default async function GuildPublicProfilePage({
               </div>
             </article>
           </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Favorite traders / recurring links"
+          description="Любимые дома появляются из repeated market sales, fulfilled demand и accepted deals. Это мягкий retention hook: хочется вернуться именно к знакомым контрагентам."
+        >
+          {data.favoriteTraders.length > 0 ? (
+            <div className="stack-sm">
+              {data.favoriteTraders.map((counterparty) => (
+                <article key={counterparty.guildId} className="row-card">
+                  <div>
+                    <div className="row-card__title">
+                      {counterparty.guildName} [{counterparty.guildTag}]
+                    </div>
+                    <p className="row-card__description">
+                      {counterparty.relationshipLabel} · {counterparty.summary}
+                      <br />
+                      {counterparty.interactionCount} interactions · {counterparty.channelCount} channels · {counterparty.recentInteractions} recent
+                      <br />
+                      Sales {counterparty.marketSalesAsSeller + counterparty.marketSalesAsBuyer} · requests {counterparty.buyOrderSupplied + counterparty.buyOrderReceived} · deals {counterparty.acceptedDeals}
+                    </p>
+                  </div>
+                  <div className="row-card__aside">
+                    <Pill tone={counterparty.isCurrentContext ? "success" : "accent"}>{counterparty.relationshipLabel}</Pill>
+                    <Link className="button button--ghost" href={counterparty.profileHref}>
+                      Профиль
+                    </Link>
+                    <Link className="button button--ghost" href={counterparty.marketHref}>
+                      Рынок
+                    </Link>
+                    <Link className="button button--ghost" href={counterparty.dealsHref}>
+                      Deal CTA
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="Favorite traders ещё не собраны" description="Как только гильдия повторно встретит те же дома через market или deals, здесь появится social memory с любимыми контрагентами." />
+          )}
         </SectionCard>
 
         <SectionCard
@@ -276,12 +376,12 @@ export default async function GuildPublicProfilePage({
         </SectionCard>
 
         <SectionCard
-          title="Recent trust-building activity"
-          description="Здесь остаются только те действия, которые реально строят public trust: successful sales, fulfilled demand, accepted deals, contract rewards и frontier clears."
+          title="Recent social memory"
+          description="Здесь остаются действия, которые строят знакомую историю мира: successful sales, fulfilled demand, accepted deals, contract rewards и frontier clears с памятью о контрагенте."
         >
-          {data.recentActivity.length > 0 ? (
+          {data.socialMemory.length > 0 ? (
             <div className="stack-sm">
-              {data.recentActivity.map((entry) => (
+              {data.socialMemory.map((entry) => (
                 <article key={entry.id} className="row-card">
                   <div>
                     <div className="row-card__title">{entry.title}</div>
@@ -289,8 +389,12 @@ export default async function GuildPublicProfilePage({
                       {entry.summary}
                       <br />
                       {entry.detail}
-                      <br />
-                      {entry.prestigeImpactLabel}
+                      {entry.counterpartyGuildTag ? (
+                        <>
+                          <br />
+                          Social memory: {entry.counterpartyGuildTag}
+                        </>
+                      ) : null}
                     </p>
                   </div>
                   <div className="row-card__aside">
