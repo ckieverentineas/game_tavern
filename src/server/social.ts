@@ -5,6 +5,7 @@ import {
   EconomyEventType,
   ExpeditionResultTier,
   ExpeditionStatus,
+  GuildDiplomacyStance,
   MarketListingStatus,
   Prisma,
   ResourceType,
@@ -29,6 +30,22 @@ import {
   loadWorldEventBoardSnapshot,
   type WorldEventBoardSnapshot,
 } from "@/server/world-events";
+import {
+  applyDiplomacyOverlay,
+  buildViewerGuildDiplomacy,
+  createEmptyGuildDiplomacySnapshot,
+  createEmptyGuildDiplomacyState,
+  type GuildDiplomacyPairSnapshot,
+  type GuildDiplomacyRelation,
+  type GuildDiplomacyRelationRow,
+  type GuildDiplomacySnapshot,
+} from "@/server/diplomacy";
+
+export type {
+  GuildDiplomacyActivity,
+  GuildDiplomacyBadge,
+  GuildDiplomacyTarget,
+} from "@/server/diplomacy";
 
 type Tone = "neutral" | "accent" | "success" | "warning";
 
@@ -257,6 +274,7 @@ export type GuildPrestigeSummary = {
   isCurrentContext: boolean;
   prestige: GuildPrestigeSurface;
   renown: GuildRenownSurface;
+  diplomacy: GuildDiplomacySnapshot;
   recurringSummary: GuildRecurringInteractionSummary;
   favoriteCounterparties: GuildFavoriteCounterparty[];
 };
@@ -304,6 +322,9 @@ export type GuildDirectoryPageData = {
     renownLeaders: number;
     recentTrustActions: number;
     recurringPairs: number;
+    endorsementMarks: number;
+    rivalryTags: number;
+    mutualAlliancePairs: number;
   };
   leaderboards: GuildLeaderboardSnapshot[];
   guilds: Array<{
@@ -322,15 +343,17 @@ export type GuildDirectoryPageData = {
     contractsCompleted: number;
     privateDealsCompleted: number;
     completedExpeditions: number;
-    pveLabel: string;
-    socialSummary: string;
-    favoriteCounterparties: GuildFavoriteCounterparty[];
-    recurringSummary: GuildRecurringInteractionSummary;
-    profileHref: string;
-    marketHref: string;
-    dealsHref: string;
-    isCurrentContext: boolean;
-    isWatched: boolean;
+      pveLabel: string;
+      socialSummary: string;
+      favoriteCounterparties: GuildFavoriteCounterparty[];
+      recurringSummary: GuildRecurringInteractionSummary;
+      diplomacy: GuildDiplomacySnapshot;
+      viewerDiplomacy: GuildDiplomacyPairSnapshot | null;
+      profileHref: string;
+      marketHref: string;
+      dealsHref: string;
+      isCurrentContext: boolean;
+      isWatched: boolean;
   }>;
   players: Array<{
     userId: string;
@@ -385,6 +408,8 @@ export type GuildPublicProfilePageData = {
   };
   prestige: GuildPrestigeSnapshot;
   renown: GuildRenownSnapshot;
+  diplomacy: GuildDiplomacySnapshot;
+  viewerDiplomacy: GuildDiplomacyPairSnapshot | null;
   leaderboardPlacements: Array<{
     key: GuildLeaderboardKey;
     title: string;
@@ -489,6 +514,8 @@ type SocialComputedGuild = {
   metrics: SocialGuildMetrics;
   reputation: GuildPrestigeSnapshot;
   renown: GuildRenownSnapshot;
+  diplomacy: GuildDiplomacySnapshot;
+  diplomacyState: ReturnType<typeof createEmptyGuildDiplomacyState>;
   recurringSummary: GuildRecurringInteractionSummary;
   favoriteCounterparties: GuildFavoriteCounterparty[];
   pveLabel: string;
@@ -818,6 +845,24 @@ function buildWatchReason(input: {
   guild: SocialComputedGuild;
   currentGuild: SocialComputedGuild | null;
 }) {
+  const outgoingRelation = input.currentGuild?.diplomacyState.outgoingByTag.get(input.guild.tag) ?? null;
+
+  if (outgoingRelation) {
+    return {
+      label: outgoingRelation.relationLabel,
+      detail: outgoingRelation.reasonDetail,
+    };
+  }
+
+  const incomingRelation = input.currentGuild?.diplomacyState.incomingByTag.get(input.guild.tag) ?? null;
+
+  if (incomingRelation) {
+    return {
+      label: incomingRelation.relationLabel,
+      detail: incomingRelation.reasonDetail,
+    };
+  }
+
   const favoriteCounterparty = input.currentGuild?.favoriteCounterparties.find(
     (entry) => entry.guildTag === input.guild.tag,
   ) ?? null;
@@ -891,10 +936,21 @@ function buildAutoSeededWatchTags(input: {
   guilds: SocialComputedGuild[];
   currentGuild: SocialComputedGuild | null;
 }) {
+  const diplomacyTags = [
+    ...(input.currentGuild?.diplomacy.outgoingEndorsements.map((entry) => entry.guildTag) ?? []),
+    ...(input.currentGuild?.diplomacy.outgoingRivalries.map((entry) => entry.guildTag) ?? []),
+  ];
   const favoriteTags = input.currentGuild?.favoriteCounterparties.map((entry) => entry.guildTag) ?? [];
   const fallbackTags = [...input.guilds]
     .filter((guild) => !guild.isCurrentContext)
     .sort((left, right) => {
+      const leftDiplomacy = Number(diplomacyTags.includes(left.tag));
+      const rightDiplomacy = Number(diplomacyTags.includes(right.tag));
+
+      if (rightDiplomacy !== leftDiplomacy) {
+        return rightDiplomacy - leftDiplomacy;
+      }
+
       const leftFavorite = Number(favoriteTags.includes(left.tag));
       const rightFavorite = Number(favoriteTags.includes(right.tag));
 
@@ -911,7 +967,7 @@ function buildAutoSeededWatchTags(input: {
     })
     .map((guild) => guild.tag);
 
-  return [...new Set([...favoriteTags, ...fallbackTags])].slice(0, WATCHLIST_AUTOFILL_COUNT);
+  return [...new Set([...diplomacyTags, ...favoriteTags, ...fallbackTags])].slice(0, WATCHLIST_AUTOFILL_COUNT);
 }
 
 function getNextLevelXp(level: number) {
@@ -1914,6 +1970,8 @@ function buildComputedGuild(input: {
     metrics,
     reputation,
     renown,
+    diplomacy: createEmptyGuildDiplomacySnapshot(),
+    diplomacyState: createEmptyGuildDiplomacyState(),
     recurringSummary: counterpartySnapshot.recurringSummary,
     favoriteCounterparties: counterpartySnapshot.top,
     pveLabel: `${pveMetrics.unlockedLocationCount}/${pveMetrics.totalLocationCount} зон · ${pveMetrics.highestUnlockedRiskLabel}`,
@@ -1956,7 +2014,7 @@ function rankGuilds(
 }
 
 async function loadComputedGuilds(currentGuildTag: string | null) {
-  const [locations, guilds, marketRows, buyOrderRows, tradeOfferRows, ledgerRows, expeditionRows] = await Promise.all([
+  const [locations, guilds, marketRows, buyOrderRows, tradeOfferRows, ledgerRows, expeditionRows, diplomacyRows] = await Promise.all([
     prisma.location.findMany({
       where: { isEnabled: true },
       orderBy: { requiredGuildLevel: "asc" },
@@ -2024,6 +2082,15 @@ async function loadComputedGuilds(currentGuildTag: string | null) {
         },
       },
     }),
+    prisma.guildDiplomacyRelation.findMany({
+      select: {
+        sourceGuildId: true,
+        targetGuildId: true,
+        stance: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    }),
   ]);
 
   const guildDirectory = new Map(guilds.map((guild) => [guild.id, { id: guild.id, name: guild.name, tag: guild.tag }]));
@@ -2071,7 +2138,7 @@ async function loadComputedGuilds(currentGuildTag: string | null) {
   const renownRanks = new Map(renownRankedGuilds.map((guild, index) => [guild.id, index + 1]));
   const prestigeRanks = new Map(prestigeRankedGuilds.map((guild, index) => [guild.id, index + 1]));
 
-  return computedGuilds.map((guild) => ({
+  const rankedGuilds = computedGuilds.map((guild) => ({
     ...guild,
     renown: {
       ...guild.renown,
@@ -2084,6 +2151,8 @@ async function loadComputedGuilds(currentGuildTag: string | null) {
       total,
     },
   }));
+
+  return applyDiplomacyOverlay(rankedGuilds, diplomacyRows as GuildDiplomacyRelationRow[]);
 }
 
 function buildLeaderboards(guilds: SocialComputedGuild[]) {
@@ -2240,6 +2309,7 @@ function mapToPrestigeSummary(guild: SocialComputedGuild): GuildPrestigeSummary 
       primaryBadgeLabel: guild.reputation.primaryBadgeLabel,
       badges: guild.reputation.badges,
     },
+    diplomacy: guild.diplomacy,
     recurringSummary: guild.recurringSummary,
     favoriteCounterparties: guild.favoriteCounterparties,
   };
@@ -2609,6 +2679,13 @@ async function loadSocialWatchContext(input: {
   const suggestedGuilds = [...guilds]
     .filter((guild) => !guild.isCurrentContext && !watchedGuildSet.has(guild.tag))
     .sort((left, right) => {
+      const leftDiplomacy = Number(Boolean(currentGuild?.diplomacyState.outgoingByTag.get(left.tag)));
+      const rightDiplomacy = Number(Boolean(currentGuild?.diplomacyState.outgoingByTag.get(right.tag)));
+
+      if (rightDiplomacy !== leftDiplomacy) {
+        return rightDiplomacy - leftDiplomacy;
+      }
+
       const leftFavorite = Number(Boolean(currentGuild?.favoriteCounterparties.some((entry) => entry.guildTag === left.tag)));
       const rightFavorite = Number(Boolean(currentGuild?.favoriteCounterparties.some((entry) => entry.guildTag === right.tag)));
 
@@ -2762,6 +2839,146 @@ export async function unfollowGuildForCurrentContext(guildTag: string) {
   };
 }
 
+type GuildDiplomacyMutationResult = {
+  guildName: string;
+  guildTag: string;
+  currentGuildTag: string;
+  previousRelation: GuildDiplomacyRelation;
+  currentRelation: GuildDiplomacyRelation;
+};
+
+async function resolveGuildDiplomacyMutation(guildTag: string) {
+  const currentGuild = await getActiveGuildIdentity();
+  const normalizedGuildTag = guildTag.trim().toUpperCase();
+
+  if (!currentGuild) {
+    throw new Error("Активная гильдия недоступна для diplomacy action.");
+  }
+
+  if (!normalizedGuildTag) {
+    throw new Error("Укажите гильдию для diplomacy action.");
+  }
+
+  if (currentGuild.tag === normalizedGuildTag) {
+    throw new Error("Нельзя менять diplomacy relation к собственной гильдии.");
+  }
+
+  const targetGuild = await prisma.guild.findUnique({
+    where: { tag: normalizedGuildTag },
+    select: { id: true, name: true, tag: true },
+  });
+
+  if (!targetGuild) {
+    throw new Error("Выбранная гильдия не найдена в public directory.");
+  }
+
+  const existingRelation = await prisma.guildDiplomacyRelation.findUnique({
+    where: {
+      sourceGuildId_targetGuildId: {
+        sourceGuildId: currentGuild.id,
+        targetGuildId: targetGuild.id,
+      },
+    },
+    select: { stance: true },
+  });
+
+  return {
+    currentGuild,
+    targetGuild,
+    existingRelation:
+      existingRelation?.stance === GuildDiplomacyStance.ENDORSEMENT
+        ? ("endorsement" as const)
+        : existingRelation?.stance === GuildDiplomacyStance.RIVALRY
+          ? ("rivalry" as const)
+          : ("neutral" as const),
+  };
+}
+
+async function setGuildDiplomacyRelationForCurrentContext(
+  guildTag: string,
+  stance: GuildDiplomacyStance,
+): Promise<GuildDiplomacyMutationResult> {
+  const context = await resolveGuildDiplomacyMutation(guildTag);
+  const currentRelation = stance === GuildDiplomacyStance.ENDORSEMENT ? "endorsement" : "rivalry";
+
+  await prisma.guildDiplomacyRelation.upsert({
+    where: {
+      sourceGuildId_targetGuildId: {
+        sourceGuildId: context.currentGuild.id,
+        targetGuildId: context.targetGuild.id,
+      },
+    },
+    update: { stance },
+    create: {
+      sourceGuildId: context.currentGuild.id,
+      targetGuildId: context.targetGuild.id,
+      stance,
+    },
+  });
+
+  return {
+    guildName: context.targetGuild.name,
+    guildTag: context.targetGuild.tag,
+    currentGuildTag: context.currentGuild.tag,
+    previousRelation: context.existingRelation,
+    currentRelation,
+  };
+}
+
+export async function endorseGuildForCurrentContext(guildTag: string) {
+  return setGuildDiplomacyRelationForCurrentContext(guildTag, GuildDiplomacyStance.ENDORSEMENT);
+}
+
+export async function markGuildRivalForCurrentContext(guildTag: string) {
+  return setGuildDiplomacyRelationForCurrentContext(guildTag, GuildDiplomacyStance.RIVALRY);
+}
+
+export async function unmarkGuildRivalForCurrentContext(guildTag: string): Promise<GuildDiplomacyMutationResult> {
+  const context = await resolveGuildDiplomacyMutation(guildTag);
+
+  if (context.existingRelation === "rivalry") {
+    await prisma.guildDiplomacyRelation.delete({
+      where: {
+        sourceGuildId_targetGuildId: {
+          sourceGuildId: context.currentGuild.id,
+          targetGuildId: context.targetGuild.id,
+        },
+      },
+    });
+  }
+
+  return {
+    guildName: context.targetGuild.name,
+    guildTag: context.targetGuild.tag,
+    currentGuildTag: context.currentGuild.tag,
+    previousRelation: context.existingRelation,
+    currentRelation: context.existingRelation === "rivalry" ? "neutral" : context.existingRelation,
+  };
+}
+
+export async function clearGuildDiplomacyRelationForCurrentContext(guildTag: string): Promise<GuildDiplomacyMutationResult> {
+  const context = await resolveGuildDiplomacyMutation(guildTag);
+
+  if (context.existingRelation !== "neutral") {
+    await prisma.guildDiplomacyRelation.delete({
+      where: {
+        sourceGuildId_targetGuildId: {
+          sourceGuildId: context.currentGuild.id,
+          targetGuildId: context.targetGuild.id,
+        },
+      },
+    });
+  }
+
+  return {
+    guildName: context.targetGuild.name,
+    guildTag: context.targetGuild.tag,
+    currentGuildTag: context.currentGuild.tag,
+    previousRelation: context.existingRelation,
+    currentRelation: "neutral",
+  };
+}
+
 export async function loadGuildDirectoryPageData(): Promise<GuildDirectoryPageData> {
   const currentGuild = await getActiveGuildIdentity();
   const [guilds, worldEventBoard] = await Promise.all([
@@ -2796,6 +3013,9 @@ export async function loadGuildDirectoryPageData(): Promise<GuildDirectoryPageDa
       renownLeaders: guilds.filter((guild) => guild.renown.score >= 36).length,
       recentTrustActions: guilds.reduce((sum, guild) => sum + guild.metrics.recentTrustActions, 0),
       recurringPairs: guilds.reduce((sum, guild) => sum + guild.recurringSummary.recurringCounterparties, 0),
+      endorsementMarks: guilds.reduce((sum, guild) => sum + guild.diplomacy.outgoingEndorsementCount, 0),
+      rivalryTags: guilds.reduce((sum, guild) => sum + guild.diplomacy.outgoingRivalryCount, 0),
+      mutualAlliancePairs: Math.floor(guilds.reduce((sum, guild) => sum + guild.diplomacy.mutualEndorsementCount, 0) / 2),
     },
     leaderboards,
     guilds: [...guilds]
@@ -2836,6 +3056,11 @@ export async function loadGuildDirectoryPageData(): Promise<GuildDirectoryPageDa
         socialSummary: guild.socialSummary,
         favoriteCounterparties: guild.favoriteCounterparties,
         recurringSummary: guild.recurringSummary,
+        diplomacy: guild.diplomacy,
+        viewerDiplomacy: buildViewerGuildDiplomacy({
+          currentGuild: watchContext.currentGuild,
+          targetGuild: guild,
+        }),
         profileHref: guild.profileHref,
         marketHref: guild.marketHref,
         dealsHref: guild.dealsHref,
@@ -3203,6 +3428,11 @@ export async function loadGuildPublicProfilePageData(
     },
     prestige: computedGuild.reputation,
     renown: computedGuild.renown,
+    diplomacy: computedGuild.diplomacy,
+    viewerDiplomacy: buildViewerGuildDiplomacy({
+      currentGuild: watchContext.currentGuild,
+      targetGuild: computedGuild,
+    }),
     leaderboardPlacements: buildLeaderboardPlacements(guilds, computedGuild.id),
     featuredHeroes: guildDetail.heroes.map((hero) => ({
       id: hero.id,

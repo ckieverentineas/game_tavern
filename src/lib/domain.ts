@@ -21,10 +21,10 @@ export const MANAGED_DEMO_GUILD_TAGS = [
 export type ManagedDemoGuildTag = (typeof MANAGED_DEMO_GUILD_TAGS)[number];
 
 export const MANAGED_DEMO_GUILD_FOCUS_LABELS: Record<ManagedDemoGuildTag, string> = {
-  DEMO: "Trusted house baseline: рынок, контракты и private deals уже читаются как репутация.",
-  RIVL: "Demand broker: плотный рынок, закрытие buy orders и агрессивный barter-поток.",
-  CNDR: "Elite explorers: high-risk PvE и поздний prestige через frontier clears.",
-  MOSS: "Rising guild: молодой публичный профиль и ранний social climb.",
+  DEMO: "Trusted house baseline: рынок, контракты, ally endorsements и rivalry-lite already readable.",
+  RIVL: "Demand broker: плотный рынок, закрытие buy orders и мягкий rivalry pressure на соседей.",
+  CNDR: "Elite explorers: high-risk PvE, public prestige и status endorsements от знакомых домов.",
+  MOSS: "Rising guild: молодой публичный профиль и быстрый social climb через endorsements.",
 };
 
 export const APP_NAVIGATION = [
@@ -140,6 +140,10 @@ export const FOUNDATION_ACTIONS = [
   "returnToAuthenticatedGuild",
   "createStarterGuild",
   "switchActiveGuild",
+  "endorseGuild",
+  "markGuildRival",
+  "unmarkGuildRival",
+  "clearGuildDiplomacy",
   "equipItemToHero",
   "unequipItemFromHero",
   "upgradeInventoryItem",

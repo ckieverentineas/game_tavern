@@ -43,7 +43,14 @@ import {
   setActivePlayContext,
   setActiveDemoGuildTag,
 } from "@/server/foundation";
-import { followGuildForCurrentContext, unfollowGuildForCurrentContext } from "@/server/social";
+import {
+  clearGuildDiplomacyRelationForCurrentContext,
+  endorseGuildForCurrentContext,
+  followGuildForCurrentContext,
+  markGuildRivalForCurrentContext,
+  unmarkGuildRivalForCurrentContext,
+  unfollowGuildForCurrentContext,
+} from "@/server/social";
 
 type StatusTone = "success" | "warning" | "danger";
 type SupportedGuildUpgradeType =
@@ -427,6 +434,110 @@ export async function unfollowGuild(formData: FormData) {
     revalidatePath(`/guilds/${encodeURIComponent(result.guildTag)}`);
     revalidatePath(redirectPath);
     message = `${result.guildName} [${result.guildTag}] убрана из ${result.storageMode === "account" ? "личного watchlist" : "sandbox watchlist"}.`;
+  } catch (error) {
+    tone = "danger";
+    message = describeFoundationError(error);
+  }
+
+  redirect(buildRedirectUrl(redirectPath, tone, message));
+}
+
+export async function endorseGuild(formData: FormData) {
+  const redirectPath = getRedirectPath(formData, "/guilds");
+  let tone: StatusTone = "success";
+  let message = "";
+
+  try {
+    const guildTag = readString(formData, "guildTag");
+
+    if (!guildTag) {
+      throw new Error("Укажите гильдию для endorsement.");
+    }
+
+    const result = await endorseGuildForCurrentContext(guildTag);
+    revalidatePath("/", "layout");
+    revalidateMany(["/dashboard", "/guilds", "/market", "/deals"]);
+    revalidatePath(`/guilds/${encodeURIComponent(result.guildTag)}`);
+    revalidatePath(redirectPath);
+    message = `${result.guildName} [${result.guildTag}] отмечена endorsement-меткой для ${result.currentGuildTag}.`;
+  } catch (error) {
+    tone = "danger";
+    message = describeFoundationError(error);
+  }
+
+  redirect(buildRedirectUrl(redirectPath, tone, message));
+}
+
+export async function markGuildRival(formData: FormData) {
+  const redirectPath = getRedirectPath(formData, "/guilds");
+  let tone: StatusTone = "success";
+  let message = "";
+
+  try {
+    const guildTag = readString(formData, "guildTag");
+
+    if (!guildTag) {
+      throw new Error("Укажите гильдию для rivalry tag.");
+    }
+
+    const result = await markGuildRivalForCurrentContext(guildTag);
+    revalidatePath("/", "layout");
+    revalidateMany(["/dashboard", "/guilds", "/market", "/deals"]);
+    revalidatePath(`/guilds/${encodeURIComponent(result.guildTag)}`);
+    revalidatePath(redirectPath);
+    message = `${result.guildName} [${result.guildTag}] добавлена в rivalry-lite board для ${result.currentGuildTag}.`;
+  } catch (error) {
+    tone = "danger";
+    message = describeFoundationError(error);
+  }
+
+  redirect(buildRedirectUrl(redirectPath, tone, message));
+}
+
+export async function unmarkGuildRival(formData: FormData) {
+  const redirectPath = getRedirectPath(formData, "/guilds");
+  let tone: StatusTone = "success";
+  let message = "";
+
+  try {
+    const guildTag = readString(formData, "guildTag");
+
+    if (!guildTag) {
+      throw new Error("Укажите гильдию для снятия rivalry tag.");
+    }
+
+    const result = await unmarkGuildRivalForCurrentContext(guildTag);
+    revalidatePath("/", "layout");
+    revalidateMany(["/dashboard", "/guilds", "/market", "/deals"]);
+    revalidatePath(`/guilds/${encodeURIComponent(result.guildTag)}`);
+    revalidatePath(redirectPath);
+    message = `${result.guildName} [${result.guildTag}] снята с rivalry-lite board для ${result.currentGuildTag}.`;
+  } catch (error) {
+    tone = "danger";
+    message = describeFoundationError(error);
+  }
+
+  redirect(buildRedirectUrl(redirectPath, tone, message));
+}
+
+export async function clearGuildDiplomacy(formData: FormData) {
+  const redirectPath = getRedirectPath(formData, "/guilds");
+  let tone: StatusTone = "success";
+  let message = "";
+
+  try {
+    const guildTag = readString(formData, "guildTag");
+
+    if (!guildTag) {
+      throw new Error("Укажите гильдию для очистки diplomacy relation.");
+    }
+
+    const result = await clearGuildDiplomacyRelationForCurrentContext(guildTag);
+    revalidatePath("/", "layout");
+    revalidateMany(["/dashboard", "/guilds", "/market", "/deals"]);
+    revalidatePath(`/guilds/${encodeURIComponent(result.guildTag)}`);
+    revalidatePath(redirectPath);
+    message = `${result.guildName} [${result.guildTag}] возвращена в neutral relation для ${result.currentGuildTag}.`;
   } catch (error) {
     tone = "danger";
     message = describeFoundationError(error);

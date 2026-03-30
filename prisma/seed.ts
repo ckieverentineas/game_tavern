@@ -7,6 +7,7 @@ import {
   ExpeditionResultTier,
   EquipmentSlot,
   ExpeditionStatus,
+  GuildDiplomacyStance,
   GuildUpgradeType,
   HeroClass,
   HeroRarity,
@@ -34,6 +35,7 @@ const prisma = new PrismaClient();
 async function main() {
   await prisma.authSession.deleteMany();
   await prisma.guildWatchlistEntry.deleteMany();
+  await prisma.guildDiplomacyRelation.deleteMany();
   await prisma.auditFlag.deleteMany();
   await prisma.economyLedgerEntry.deleteMany();
   await prisma.tradeOfferItem.deleteMany();
@@ -2257,6 +2259,74 @@ async function main() {
       },
     }),
   ]);
+
+  await prisma.guildDiplomacyRelation.createMany({
+    data: [
+      {
+        sourceGuildId: demoGuild.id,
+        targetGuildId: rivalGuild.id,
+        stance: GuildDiplomacyStance.RIVALRY,
+        createdAt: daysAgo(3),
+        updatedAt: hoursAgo(9),
+      },
+      {
+        sourceGuildId: rivalGuild.id,
+        targetGuildId: demoGuild.id,
+        stance: GuildDiplomacyStance.RIVALRY,
+        createdAt: daysAgo(2),
+        updatedAt: hoursAgo(7),
+      },
+      {
+        sourceGuildId: demoGuild.id,
+        targetGuildId: mossGuild.id,
+        stance: GuildDiplomacyStance.ENDORSEMENT,
+        createdAt: daysAgo(2),
+        updatedAt: hoursAgo(6),
+      },
+      {
+        sourceGuildId: mossGuild.id,
+        targetGuildId: demoGuild.id,
+        stance: GuildDiplomacyStance.ENDORSEMENT,
+        createdAt: daysAgo(1),
+        updatedAt: hoursAgo(5),
+      },
+      {
+        sourceGuildId: cinderGuild.id,
+        targetGuildId: demoGuild.id,
+        stance: GuildDiplomacyStance.ENDORSEMENT,
+        createdAt: daysAgo(4),
+        updatedAt: hoursAgo(10),
+      },
+      {
+        sourceGuildId: demoGuild.id,
+        targetGuildId: cinderGuild.id,
+        stance: GuildDiplomacyStance.ENDORSEMENT,
+        createdAt: daysAgo(4),
+        updatedAt: hoursAgo(8),
+      },
+      {
+        sourceGuildId: cinderGuild.id,
+        targetGuildId: rivalGuild.id,
+        stance: GuildDiplomacyStance.RIVALRY,
+        createdAt: daysAgo(3),
+        updatedAt: hoursAgo(11),
+      },
+      {
+        sourceGuildId: rivalGuild.id,
+        targetGuildId: cinderGuild.id,
+        stance: GuildDiplomacyStance.ENDORSEMENT,
+        createdAt: daysAgo(2),
+        updatedAt: hoursAgo(12),
+      },
+      {
+        sourceGuildId: mossGuild.id,
+        targetGuildId: rivalGuild.id,
+        stance: GuildDiplomacyStance.RIVALRY,
+        createdAt: daysAgo(1),
+        updatedAt: hoursAgo(4),
+      },
+    ],
+  });
 
   await prisma.guildUpgrade.createMany({
     data: [

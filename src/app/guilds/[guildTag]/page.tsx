@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { GuildDiplomacyControls } from "@/components/guild-diplomacy-controls";
 import { GuildWatchToggle } from "@/components/guild-watch-toggle";
 import { EmptyState, InfoCard, Notice, PageHeader, Pill, SectionCard } from "@/components/ui";
 import { type PageSearchParams, formatDateTime, formatNumber, readActionFeedback } from "@/lib/format";
@@ -35,6 +36,12 @@ export default async function GuildPublicProfilePage({
   }
 
   const { data } = snapshot;
+  const viewerRelation = data.viewerDiplomacy?.relation ?? "neutral";
+  const viewerRelationTone = viewerRelation === "rivalry"
+    ? "accent"
+    : viewerRelation === "endorsement" || data.viewerDiplomacy?.isEndorsedByTarget
+      ? "success"
+      : "neutral";
 
   return (
     <div className="page-stack">
@@ -48,13 +55,24 @@ export default async function GuildPublicProfilePage({
               Смотреть market context
             </Link>
             {!data.guild.isCurrentContext ? (
-              <GuildWatchToggle
-                guildTag={data.guild.tag}
-                isWatched={data.isWatched}
-                redirectTo={`/guilds/${encodeURIComponent(data.guild.tag)}`}
-                followLabel="Добавить в watchlist"
-                unfollowLabel="Убрать из watchlist"
-              />
+              <>
+                <GuildWatchToggle
+                  guildTag={data.guild.tag}
+                  isWatched={data.isWatched}
+                  redirectTo={`/guilds/${encodeURIComponent(data.guild.tag)}`}
+                  followLabel="Добавить в watchlist"
+                  unfollowLabel="Убрать из watchlist"
+                />
+                <GuildDiplomacyControls
+                  guildTag={data.guild.tag}
+                  relation={viewerRelation}
+                  redirectTo={`/guilds/${encodeURIComponent(data.guild.tag)}`}
+                  endorseLabel="Endorse"
+                  rivalLabel="Tag rival"
+                  unrivalLabel="Убрать rival"
+                  clearLabel="Neutral"
+                />
+              </>
             ) : null}
             <Link className="button button--ghost" href={data.socialCtas.dealsHref}>
               Private deal CTA
@@ -89,6 +107,16 @@ export default async function GuildPublicProfilePage({
       <Notice tone={data.renown.tone}>
         <strong>{data.renown.tierLabel}.</strong> {data.renown.spotlight}
       </Notice>
+
+      <Notice tone={data.diplomacy.tone}>
+        <strong>{data.diplomacy.statusLabel}.</strong> {data.diplomacy.spotlight}
+      </Notice>
+
+      {data.viewerDiplomacy ? (
+        <Notice tone={viewerRelationTone}>
+          <strong>{data.viewerDiplomacy.relationLabel}.</strong> {data.viewerDiplomacy.summary}
+        </Notice>
+      ) : null}
 
       <Notice tone="accent">
         <strong>{data.worldEventBoard.season.label}.</strong> Профиль теперь показывает не только prestige-историю,
@@ -127,6 +155,12 @@ export default async function GuildPublicProfilePage({
           tone="accent"
         />
         <InfoCard
+          title="Diplomacy"
+          value={`${data.diplomacy.endorsementCount}/${data.diplomacy.rivalryCount}`}
+          detail={`${data.diplomacy.outgoingEndorsementCount} outgoing endorsements · ${data.diplomacy.outgoingRivalryCount} outgoing rivalry tags.`}
+          tone={data.diplomacy.tone}
+        />
+        <InfoCard
           title="Wealth"
           value={formatNumber(data.guild.gold)}
           detail={`Market activity ${data.guild.marketActivity} · лотов ${data.guild.activeListingsCount} · спрос ${data.guild.activeBuyOrdersCount}.`}
@@ -145,6 +179,55 @@ export default async function GuildPublicProfilePage({
       </div>
 
       <div className="content-grid content-grid--two-thirds">
+        <SectionCard
+          title="Diplomacy snapshot"
+          description="Лёгкий relational слой поверх существующих loops: endorsements усиливают trust/familiarity, rivalry tags добавляют мягкое соревновательное давление без PvP-войн."
+          aside={<Pill tone={data.diplomacy.tone}>{data.diplomacy.statusLabel}</Pill>}
+        >
+          <div className="stack-sm">
+            <article className="row-card">
+              <div>
+                <div className="row-card__title">Public diplomacy memory</div>
+                <p className="row-card__description">
+                  {data.diplomacy.summary}
+                  <br />
+                  {data.viewerDiplomacy?.mutualHistorySummary ?? "Прямой viewer-to-guild relation пока не задан."}
+                  <br />
+                  Suggested allies: {data.diplomacy.suggestedAllies.map((entry) => entry.guildTag).join(" • ") || "пока не выбраны"}
+                  <br />
+                  Suggested rivals: {data.diplomacy.suggestedRivals.map((entry) => entry.guildTag).join(" • ") || "пока не выбраны"}
+                </p>
+              </div>
+              <div className="row-card__aside">
+                {data.diplomacy.badges.map((badge) => (
+                  <Pill key={badge.key} tone={badge.tone}>{badge.label}</Pill>
+                ))}
+              </div>
+            </article>
+
+            {[
+              { title: "Incoming endorsements", entries: data.diplomacy.incomingEndorsements },
+              { title: "Outgoing endorsements", entries: data.diplomacy.outgoingEndorsements },
+              { title: "Incoming rivalries", entries: data.diplomacy.incomingRivalries },
+              { title: "Outgoing rivalries", entries: data.diplomacy.outgoingRivalries },
+            ].map((group) => (
+              <article key={group.title} className="row-card">
+                <div>
+                  <div className="row-card__title">{group.title}</div>
+                  <p className="row-card__description">
+                    {group.entries.length > 0
+                      ? group.entries.map((entry) => `${entry.guildTag} — ${entry.reasonLabel}`).join(" • ")
+                      : "Пока пусто: эта часть diplomacy memory ещё не заполнена."}
+                  </p>
+                </div>
+                <div className="row-card__aside">
+                  <Pill tone={group.title.includes("rival") ? "accent" : "success"}>{group.entries.length}</Pill>
+                </div>
+              </article>
+            ))}
+          </div>
+        </SectionCard>
+
         <SectionCard
           title="Renown / retention loop"
           description="Renown не про raw power, а про повторные связи: familiar houses, preferred trader callouts, social badges и memory recap без лома баланса."

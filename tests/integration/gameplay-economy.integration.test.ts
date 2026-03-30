@@ -36,7 +36,13 @@ import {
   upgradeInventoryItemForDemoGuild,
 } from "@/server/game";
 import { setActiveDemoGuildTag, setActivePlayContext } from "@/server/foundation";
-import { followGuildForCurrentContext, unfollowGuildForCurrentContext } from "@/server/social";
+import {
+  clearGuildDiplomacyRelationForCurrentContext,
+  endorseGuildForCurrentContext,
+  followGuildForCurrentContext,
+  markGuildRivalForCurrentContext,
+  unfollowGuildForCurrentContext,
+} from "@/server/social";
 import { disconnectTestDatabase, resetTestDatabase } from "../helpers/test-db";
 import { unwrapFoundationResult } from "../helpers/result";
 import { resetMockCookies } from "../mocks/next-headers";
@@ -362,17 +368,40 @@ describe("gameplay/economy integration", () => {
     expect(directoryPage.worldEventBoard.events).toHaveLength(3);
     expect(directoryPage.guilds.some((guild) => guild.prestige.badges.length > 0)).toBe(true);
     expect(directoryPage.guilds.some((guild) => guild.favoriteCounterparties.length > 0)).toBe(true);
+    expect(directoryPage.community.endorsementMarks).toBeGreaterThan(0);
+    expect(directoryPage.community.rivalryTags).toBeGreaterThan(0);
+    expect(directoryPage.guilds.find((guild) => guild.guildTag === "RIVL")?.diplomacy.rivalryCount).toBeGreaterThan(0);
+    expect(directoryPage.guilds.find((guild) => guild.guildTag === "MOSS")?.diplomacy.endorsementCount).toBeGreaterThan(0);
     expect(directoryPage.watchlist.watchedGuildTags).toContain("RIVL");
     expect(directoryPage.guilds.find((guild) => guild.guildTag === "RIVL")?.isWatched).toBe(true);
     expect(dashboardWithWatchlist.watchlist.watchedGuildTags).toContain("RIVL");
     expect(dashboardWithWatchlist.followedGuilds.some((guild) => guild.guildTag === "RIVL")).toBe(true);
     expect(dashboardWithWatchlist.personalizedFeed.entries.some((entry) => entry.guildTag === "RIVL")).toBe(true);
+    expect(dashboardWithWatchlist.guildPrestige?.diplomacy.outgoingRivalryCount ?? 0).toBeGreaterThan(0);
+    expect(
+      (dashboardWithWatchlist.guildPrestige?.diplomacy.suggestedAllies.length ?? 0)
+      + (dashboardWithWatchlist.guildPrestige?.diplomacy.suggestedRivals.length ?? 0)
+      + (dashboardWithWatchlist.guildPrestige?.diplomacy.recentActivity.length ?? 0),
+    ).toBeGreaterThan(0);
     expect(profilePage.prestige.rankingContributions.length).toBe(5);
     expect(profilePage.renown.rankingContributions.length).toBe(4);
+    expect(profilePage.diplomacy.badges.length).toBeGreaterThan(0);
     expect(profilePage.favoriteTraders.length).toBeGreaterThan(0);
     expect(profilePage.socialMemory.length).toBeGreaterThan(0);
     expect(profilePage.recentActivity.length).toBeGreaterThan(0);
     expect(profilePage.worldEventBoard.events.some((event) => event.focusGuild?.guildTag === "DEMO")).toBe(true);
+
+    const endorseResult = await endorseGuildForCurrentContext("CNDR");
+    expect(endorseResult.currentRelation).toBe("endorsement");
+
+    const rivalResult = await markGuildRivalForCurrentContext("MOSS");
+    expect(rivalResult.currentRelation).toBe("rivalry");
+
+    const diplomacyProfile = unwrapFoundationResult(await getGuildPublicProfilePageData("CNDR"));
+    expect(diplomacyProfile.viewerDiplomacy?.relation).toBe("endorsement");
+
+    const resetDiplomacy = await clearGuildDiplomacyRelationForCurrentContext("CNDR");
+    expect(resetDiplomacy.currentRelation).toBe("neutral");
 
     await unfollowGuildForCurrentContext("RIVL");
     const dashboardWithoutWatchlist = unwrapFoundationResult(await getDashboardPageData());

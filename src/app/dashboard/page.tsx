@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { GuildDiplomacyControls } from "@/components/guild-diplomacy-controls";
 import { GuildWatchToggle } from "@/components/guild-watch-toggle";
 import { EmptyState, InfoCard, Notice, PageHeader, Pill, SectionCard } from "@/components/ui";
 import { FOUNDATION_ACTIONS } from "@/lib/domain";
@@ -133,6 +134,12 @@ export default async function DashboardPage({
         <Notice tone={data.guildPrestige.renown.tone}>
           <strong>{data.guildPrestige.renown.tierLabel}.</strong> {data.guildPrestige.renown.spotlight}
           {data.guildPrestige.renown.favoriteCounterpartyLabel ? ` Любимый дом сейчас: ${data.guildPrestige.renown.favoriteCounterpartyLabel}.` : ""}
+        </Notice>
+      ) : null}
+
+      {data.guildPrestige ? (
+        <Notice tone={data.guildPrestige.diplomacy.tone}>
+          <strong>{data.guildPrestige.diplomacy.statusLabel}.</strong> {data.guildPrestige.diplomacy.spotlight}
         </Notice>
       ) : null}
 
@@ -282,6 +289,14 @@ export default async function DashboardPage({
             value={data.guildPrestige.prestige.score}
             detail={`#${data.guildPrestige.prestige.rank} из ${data.guildPrestige.prestige.total} · ${data.guildPrestige.prestige.recentTrustLabel}`}
             tone={data.guildPrestige.prestige.tone}
+          />
+        ) : null}
+        {data.guildPrestige ? (
+          <InfoCard
+            title="Diplomacy"
+            value={`${data.guildPrestige.diplomacy.endorsementCount}/${data.guildPrestige.diplomacy.rivalryCount}`}
+            detail={`${data.guildPrestige.diplomacy.outgoingEndorsementCount} outgoing endorsements · ${data.guildPrestige.diplomacy.outgoingRivalryCount} outgoing rival tags.`}
+            tone={data.guildPrestige.diplomacy.tone}
           />
         ) : null}
         <InfoCard
@@ -640,6 +655,93 @@ export default async function DashboardPage({
           ) : null}
         </div>
       </SectionCard>
+
+      {data.guildPrestige ? (
+        <SectionCard
+          title="Diplomacy board"
+          description="Здесь собираются ally/rival targets для текущей гильдии: endorsements делают дома знакомыми и статусными, а rivalry-lite держит мягкое давление на leaderboard и seasonal гонку."
+          aside={<Pill tone={data.guildPrestige.diplomacy.tone}>{data.guildPrestige.diplomacy.statusLabel}</Pill>}
+        >
+          <div className="stack-sm">
+            <article className="row-card">
+              <div>
+                <div className="row-card__title">Current diplomacy memory</div>
+                <p className="row-card__description">
+                  {data.guildPrestige.diplomacy.summary}
+                  <br />
+                  {data.guildPrestige.diplomacy.spotlight}
+                </p>
+              </div>
+              <div className="row-card__aside">
+                {data.guildPrestige.diplomacy.badges.map((badge) => (
+                  <Pill key={badge.key} tone={badge.tone}>{badge.label}</Pill>
+                ))}
+              </div>
+            </article>
+
+            {[...data.guildPrestige.diplomacy.suggestedAllies, ...data.guildPrestige.diplomacy.suggestedRivals].map((target) => (
+              <article key={`${target.relation}-${target.guildTag}`} className="row-card">
+                <div>
+                  <div className="row-card__title">
+                    {target.guildName} [{target.guildTag}]
+                  </div>
+                  <p className="row-card__description">
+                    {target.relationLabel} · {target.reasonLabel}
+                    <br />
+                    {target.reasonDetail}
+                    <br />
+                    {target.interactionCount} interactions · {target.channelCount} channels · {target.recentInteractions} recent
+                  </p>
+                </div>
+                <div className="row-card__aside">
+                  <Pill tone={target.relation === "endorsement" ? "success" : "accent"}>{target.relationLabel}</Pill>
+                  <GuildDiplomacyControls
+                    guildTag={target.guildTag}
+                    relation="neutral"
+                    redirectTo="/dashboard"
+                    endorseLabel="Endorse"
+                    rivalLabel="Rival"
+                    unrivalLabel="Unrival"
+                    clearLabel="Neutral"
+                  />
+                  <Link className="button button--ghost" href={target.profileHref}>
+                    Профиль
+                  </Link>
+                </div>
+              </article>
+            ))}
+
+            {data.guildPrestige.diplomacy.recentActivity.map((entry) => (
+              <article key={entry.id} className="row-card">
+                <div>
+                  <div className="row-card__title">{entry.title}</div>
+                  <p className="row-card__description">
+                    {entry.summary}
+                    <br />
+                    {entry.detail}
+                  </p>
+                </div>
+                <div className="row-card__aside">
+                  <Pill tone={entry.tone}>{entry.kind === "endorsement" ? "Endorsement" : "Rivalry"}</Pill>
+                  <span className="muted">{formatDateTime(entry.at)}</span>
+                  <Link className="button button--ghost" href={entry.href}>
+                    Профиль дома
+                  </Link>
+                </div>
+              </article>
+            ))}
+
+            {data.guildPrestige.diplomacy.suggestedAllies.length === 0
+            && data.guildPrestige.diplomacy.suggestedRivals.length === 0
+            && data.guildPrestige.diplomacy.recentActivity.length === 0 ? (
+              <EmptyState
+                title="Diplomacy board пока пуст"
+                description="Как только появится ручной endorsement, rival tag или достаточно плотная social memory, board подскажет знакомые ally/rival targets автоматически."
+              />
+              ) : null}
+          </div>
+        </SectionCard>
+      ) : null}
 
       <div className="content-grid content-grid--two-thirds">
         <SectionCard

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { GuildDiplomacyControls } from "@/components/guild-diplomacy-controls";
 import { GuildWatchToggle } from "@/components/guild-watch-toggle";
 import { InfoCard, Notice, PageHeader, Pill, SectionCard } from "@/components/ui";
 import { type PageSearchParams, formatDateTime, formatNumber, readActionFeedback } from "@/lib/format";
@@ -57,6 +58,10 @@ export default async function GuildDirectoryPage({
         Renown и social memory собираются поверх уже существующих market sales, fulfilled buy orders, accepted deals, контрактов и PvE: без тяжёлого нового backend-а, но с понятной social visibility и причинами возвращаться не в пустой рынок, а к знакомым домам.
       </Notice>
 
+      <Notice tone="success">
+        Diplomacy-lite добавляет ещё один relational слой: endorsements поднимают знакомые дома в trust/public status, а rivalry tags создают мягкие причины следить за соседями по prestige и seasonal board без ввода guild wars.
+      </Notice>
+
       <Notice tone={data.watchlist.count > 0 ? (data.watchlist.isAutoSeeded ? "success" : "accent") : "neutral"}>
         <strong>{data.watchlist.storageLabel}.</strong> {data.watchlist.summary} {data.watchlist.helperText}
       </Notice>
@@ -88,6 +93,12 @@ export default async function GuildDirectoryPage({
           title="Progress surfaced"
           value={`${data.community.contractsClaimed} / ${data.community.resolvedExpeditions}`}
           detail={`Контракты, high-risk clears и repeat-business серии получают публично читаемый status вместо чисто декоративной цифры.`}
+        />
+        <InfoCard
+          title="Diplomacy marks"
+          value={`${data.community.endorsementMarks} / ${data.community.rivalryTags}`}
+          detail={`${data.community.mutualAlliancePairs} mutual ally pairs уже держат каталог relational, а не просто публичным.`}
+          tone="success"
         />
         <InfoCard
           title="Seasonal rewards"
@@ -281,6 +292,10 @@ export default async function GuildDirectoryPage({
                     ? `Favorite traders: ${guild.favoriteCounterparties.map((entry) => `${entry.guildTag} (${entry.relationshipLabel})`).join(" • ")}`
                     : "Пока любимые дома не собрались — первая серия повторных сделок быстро включит social memory."}
                   <br />
+                  {guild.diplomacy.statusLabel} · endorsements {guild.diplomacy.endorsementCount} · rivalries {guild.diplomacy.rivalryCount}
+                  <br />
+                  {guild.viewerDiplomacy?.summary ?? guild.diplomacy.spotlight}
+                  <br />
                   {guild.socialSummary}
                   <br />
                   {guild.renown.recentInteractionLabel}
@@ -291,12 +306,24 @@ export default async function GuildDirectoryPage({
                 {guild.renown.primaryPerkLabel ? <Pill tone="success">{guild.renown.primaryPerkLabel}</Pill> : null}
                 <Pill tone={guild.prestige.tone}>{guild.prestige.tierLabel}</Pill>
                 {guild.prestige.primaryBadgeLabel ? <Pill tone="accent">{guild.prestige.primaryBadgeLabel}</Pill> : null}
+                <Pill tone={guild.diplomacy.tone}>{guild.diplomacy.statusLabel}</Pill>
                 {guild.isWatched ? <Pill tone="success">В watchlist</Pill> : null}
                 <Pill tone={guild.isCurrentContext ? "success" : "accent"}>
                   {guild.isCurrentContext ? "Текущая гильдия" : "Публична"}
                 </Pill>
                 {!guild.isCurrentContext ? (
-                  <GuildWatchToggle guildTag={guild.guildTag} isWatched={guild.isWatched} redirectTo="/guilds" />
+                  <>
+                    <GuildWatchToggle guildTag={guild.guildTag} isWatched={guild.isWatched} redirectTo="/guilds" />
+                    <GuildDiplomacyControls
+                      guildTag={guild.guildTag}
+                      relation={guild.viewerDiplomacy?.relation ?? "neutral"}
+                      redirectTo="/guilds"
+                      endorseLabel="Endorse"
+                      rivalLabel="Rival"
+                      unrivalLabel="Unrival"
+                      clearLabel="Neutral"
+                    />
+                  </>
                 ) : null}
                 <Link className="button button--primary" href={guild.profileHref}>
                   Профиль

@@ -197,6 +197,11 @@ enum AuditSeverity {
   HIGH
 }
 
+enum GuildDiplomacyStance {
+  ENDORSEMENT
+  RIVALRY
+}
+
 model User {
   id          String     @id @default(cuid())
   email       String     @unique
@@ -253,6 +258,8 @@ model Guild {
   auditFlags             AuditFlag[]          @relation("AuditFlagGuild")
   relatedAuditFlags      AuditFlag[]          @relation("AuditFlagRelatedGuild")
   watchlistEntries       GuildWatchlistEntry[]
+  outgoingDiplomacyRelations GuildDiplomacyRelation[] @relation("GuildDiplomacySource")
+  incomingDiplomacyRelations GuildDiplomacyRelation[] @relation("GuildDiplomacyTarget")
 }
 
 model GuildWatchlistEntry {
@@ -266,6 +273,21 @@ model GuildWatchlistEntry {
   @@unique([userId, guildId])
   @@index([userId, createdAt])
   @@index([guildId])
+}
+
+model GuildDiplomacyRelation {
+  id            String               @id @default(cuid())
+  sourceGuildId String
+  targetGuildId String
+  stance        GuildDiplomacyStance
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  sourceGuild   Guild                @relation("GuildDiplomacySource", fields: [sourceGuildId], references: [id], onDelete: Cascade)
+  targetGuild   Guild                @relation("GuildDiplomacyTarget", fields: [targetGuildId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceGuildId, targetGuildId])
+  @@index([sourceGuildId, stance])
+  @@index([targetGuildId, stance])
 }
 
 model Hero {
