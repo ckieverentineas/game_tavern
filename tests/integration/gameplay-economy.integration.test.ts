@@ -35,7 +35,11 @@ import {
   startExpeditionForDemoGuild,
   upgradeInventoryItemForDemoGuild,
 } from "@/server/game";
-import { setActiveDemoGuildTag, setActivePlayContext } from "@/server/foundation";
+import {
+  saveGuildIdentityForCurrentContext,
+  setActiveDemoGuildTag,
+  setActivePlayContext,
+} from "@/server/foundation";
 import {
   clearGuildDiplomacyRelationForCurrentContext,
   endorseGuildForCurrentContext,
@@ -342,6 +346,16 @@ describe("gameplay/economy integration", () => {
     });
     expect(worldEventRewardMessage).toContain("Forge Drive");
 
+    const identitySaveResult = await saveGuildIdentityForCurrentContext({
+      publicTitleKey: "frontier-watch",
+      crestKey: "ember",
+      signatureColorKey: "ember",
+      motto: "Пепел помнит каждый договор.",
+      publicBio: "DEMO-house keeps the frontier open for merchants, scouts, and every contract that needs a reliable escort.",
+    });
+    expect(identitySaveResult.identity.titleKey).toBe("frontier-watch");
+    expect(identitySaveResult.identity.colorKey).toBe("ember");
+
     const dashboardAfterWorldEventClaim = unwrapFoundationResult(await getDashboardPageData());
     const forgeDrive = dashboardAfterWorldEventClaim.worldEventBoard.events.find((event) => event.key === "forge-drive");
     expect(forgeDrive?.rewardTiers.find((tier) => tier.key === "bronze")?.status).toBe("claimed");
@@ -378,6 +392,8 @@ describe("gameplay/economy integration", () => {
     expect(dashboardWithWatchlist.followedGuilds.some((guild) => guild.guildTag === "RIVL")).toBe(true);
     expect(dashboardWithWatchlist.personalizedFeed.entries.some((entry) => entry.guildTag === "RIVL")).toBe(true);
     expect(dashboardWithWatchlist.guildPrestige?.diplomacy.outgoingRivalryCount ?? 0).toBeGreaterThan(0);
+    expect(dashboardWithWatchlist.guild.identity.titleKey).toBe("frontier-watch");
+    expect(dashboardWithWatchlist.guildIdentityEditor.current.publicTitleKey).toBe("frontier-watch");
     expect(
       (dashboardWithWatchlist.guildPrestige?.diplomacy.suggestedAllies.length ?? 0)
       + (dashboardWithWatchlist.guildPrestige?.diplomacy.suggestedRivals.length ?? 0)
@@ -390,6 +406,9 @@ describe("gameplay/economy integration", () => {
     expect(profilePage.socialMemory.length).toBeGreaterThan(0);
     expect(profilePage.recentActivity.length).toBeGreaterThan(0);
     expect(profilePage.worldEventBoard.events.some((event) => event.focusGuild?.guildTag === "DEMO")).toBe(true);
+    expect(profilePage.guild.identity.motto).toBe("Пепел помнит каждый договор.");
+    expect(profilePage.guild.identity.colorKey).toBe("ember");
+    expect(directoryPage.guilds.find((guild) => guild.guildTag === "DEMO")?.identity.titleKey).toBe("frontier-watch");
 
     const endorseResult = await endorseGuildForCurrentContext("CNDR");
     expect(endorseResult.currentRelation).toBe("endorsement");

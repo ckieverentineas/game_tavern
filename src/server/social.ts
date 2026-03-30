@@ -19,6 +19,12 @@ import {
   getRarityLabel,
   getResourceLabel,
 } from "@/lib/domain";
+import {
+  buildGuildIdentitySnapshot,
+  resolveGuildIdentityState,
+  type GuildIdentitySnapshot,
+  type GuildIdentityState,
+} from "@/lib/guild-identity";
 import { prisma } from "@/lib/prisma";
 import {
   getActiveGuildIdentity,
@@ -222,6 +228,7 @@ export type WatchlistGuildCard = {
   guildId: string;
   guildName: string;
   guildTag: string;
+  identity: GuildIdentitySnapshot;
   profileHref: string;
   marketHref: string;
   dealsHref: string;
@@ -332,6 +339,7 @@ export type GuildDirectoryPageData = {
     guildName: string;
     guildTag: string;
     ownerDisplayName: string;
+    identity: GuildIdentitySnapshot;
     prestige: GuildPrestigeSurface;
     renown: GuildRenownSurface;
     level: number;
@@ -404,6 +412,7 @@ export type GuildPublicProfilePageData = {
     pveLabel: string;
     highestUnlockedRiskLabel: string;
     socialSummary: string;
+    identity: GuildIdentitySnapshot;
     isCurrentContext: boolean;
   };
   prestige: GuildPrestigeSnapshot;
@@ -510,6 +519,8 @@ type SocialComputedGuild = {
   heroSlotLimit: number;
   marketUnlocked: boolean;
   tradeUnlocked: boolean;
+  identityState: GuildIdentityState;
+  identity: GuildIdentitySnapshot;
   heroes: SocialGuildRecord["heroes"];
   metrics: SocialGuildMetrics;
   reputation: GuildPrestigeSnapshot;
@@ -553,6 +564,11 @@ const socialGuildSelect = {
   marketUnlockedAt: true,
   tradeUnlockedAt: true,
   activeHeroSlots: true,
+  publicTitleKey: true,
+  crestKey: true,
+  signatureColorKey: true,
+  motto: true,
+  publicBio: true,
   createdAt: true,
   user: {
     select: {
@@ -919,6 +935,7 @@ function mapToWatchlistGuildCard(input: {
     guildId: input.guild.id,
     guildName: input.guild.name,
     guildTag: input.guild.tag,
+    identity: input.guild.identity,
     profileHref: input.guild.profileHref,
     marketHref: input.guild.marketHref,
     dealsHref: input.guild.dealsHref,
@@ -1902,6 +1919,18 @@ function buildComputedGuild(input: {
   const highestHeroPower = input.guild.heroes[0]?.powerScore ?? 0;
   const pveMetrics = buildPveMetrics(input.guild.level, input.locations);
   const completedExpeditions = expeditionMetrics.completed + expeditionMetrics.claimed;
+  const identityState = resolveGuildIdentityState({
+    publicTitleKey: input.guild.publicTitleKey,
+    crestKey: input.guild.crestKey,
+    signatureColorKey: input.guild.signatureColorKey,
+    motto: input.guild.motto,
+    publicBio: input.guild.publicBio,
+  });
+  const identity = buildGuildIdentitySnapshot({
+    guildName: input.guild.name,
+    guildTag: input.guild.tag,
+    state: identityState,
+  });
   const marketActivity =
     marketMetrics.active +
     marketMetrics.sold +
@@ -1966,6 +1995,8 @@ function buildComputedGuild(input: {
     heroSlotLimit: input.guild.activeHeroSlots,
     marketUnlocked: Boolean(input.guild.marketUnlockedAt),
     tradeUnlocked: Boolean(input.guild.tradeUnlockedAt),
+    identityState,
+    identity,
     heroes: input.guild.heroes,
     metrics,
     reputation,
@@ -1977,8 +2008,8 @@ function buildComputedGuild(input: {
     pveLabel: `${pveMetrics.unlockedLocationCount}/${pveMetrics.totalLocationCount} зон · ${pveMetrics.highestUnlockedRiskLabel}`,
     socialSummary:
       counterpartySnapshot.recurringSummary.favoriteCounterpartyLabel
-        ? `${renown.summary}. Любимый дом: ${counterpartySnapshot.recurringSummary.favoriteCounterpartyLabel}. ${renown.spotlight}`
-        : `${renown.summary}. ${renown.spotlight}`,
+        ? `${identity.titleLabel} · «${identity.motto}» ${renown.summary}. Любимый дом: ${counterpartySnapshot.recurringSummary.favoriteCounterpartyLabel}.`
+        : `${identity.titleLabel} · «${identity.motto}» ${renown.summary}.`,
     profileHref: buildGuildProfileHref(input.guild.tag),
     marketHref: buildGuildMarketContextHref(input.guild.tag),
     dealsHref: buildGuildDealsContextHref(input.guild.tag),
@@ -3039,6 +3070,7 @@ export async function loadGuildDirectoryPageData(): Promise<GuildDirectoryPageDa
         guildName: guild.name,
         guildTag: guild.tag,
         ownerDisplayName: guild.ownerDisplayName,
+        identity: guild.identity,
         prestige: guild.reputation,
         renown: guild.renown,
         level: guild.level,
@@ -3424,6 +3456,7 @@ export async function loadGuildPublicProfilePageData(
       pveLabel: computedGuild.pveLabel,
       highestUnlockedRiskLabel: computedGuild.metrics.highestUnlockedRiskLabel,
       socialSummary: computedGuild.socialSummary,
+      identity: computedGuild.identity,
       isCurrentContext: computedGuild.isCurrentContext,
     },
     prestige: computedGuild.reputation,

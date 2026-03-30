@@ -140,6 +140,7 @@ export const FOUNDATION_ACTIONS = [
   "returnToAuthenticatedGuild",
   "createStarterGuild",
   "switchActiveGuild",
+  "saveGuildIdentity",
   "endorseGuild",
   "markGuildRival",
   "unmarkGuildRival",

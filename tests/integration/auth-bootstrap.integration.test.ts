@@ -61,6 +61,11 @@ describe("auth/bootstrap integration", () => {
             id: true,
             tag: true,
             name: true,
+            publicTitleKey: true,
+            crestKey: true,
+            signatureColorKey: true,
+            motto: true,
+            publicBio: true,
           },
         },
       },
@@ -69,6 +74,11 @@ describe("auth/bootstrap integration", () => {
     expect(createdUser?.status).toBe(UserStatus.ACTIVE);
     expect(createdUser?.guild?.tag).toBe(account.guildTag);
     expect(createdUser?.passwordHash).toBeTruthy();
+    expect(createdUser?.guild?.publicTitleKey).toBeTruthy();
+    expect(createdUser?.guild?.crestKey).toBeTruthy();
+    expect(createdUser?.guild?.signatureColorKey).toBeTruthy();
+    expect(createdUser?.guild?.motto.length ?? 0).toBeGreaterThan(0);
+    expect(createdUser?.guild?.publicBio.length ?? 0).toBeGreaterThan(0);
 
     if (!createdUser?.passwordHash) {
       throw new Error("У созданного пользователя отсутствует passwordHash.");
@@ -85,6 +95,8 @@ describe("auth/bootstrap integration", () => {
     await setActivePlayContext("user");
     const authenticatedGuild = await getActiveGuildIdentity();
     expect(authenticatedGuild.tag).toBe(account.guildTag);
+    expect(authenticatedGuild.identity.showcaseTitle).toContain(account.guildName);
+    expect(authenticatedGuild.identity.motto.length).toBeGreaterThan(0);
 
     await setActiveDemoGuildTag("RIVL");
     await setActivePlayContext("demo");
@@ -113,4 +125,3 @@ describe("auth/bootstrap integration", () => {
     expect(viewer?.guild?.name).toBe(account.guildName);
   });
 });
-

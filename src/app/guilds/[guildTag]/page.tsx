@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { GuildIdentityMark, getGuildIdentitySurfaceStyle } from "@/components/guild-identity";
 import { GuildDiplomacyControls } from "@/components/guild-diplomacy-controls";
 import { GuildWatchToggle } from "@/components/guild-watch-toggle";
 import { EmptyState, InfoCard, Notice, PageHeader, Pill, SectionCard } from "@/components/ui";
@@ -85,6 +86,35 @@ export default async function GuildPublicProfilePage({
       />
 
       {feedback ? <Notice tone={feedback.tone}>{feedback.message}</Notice> : null}
+
+      <section className="identity-showcase" style={getGuildIdentitySurfaceStyle(data.guild.identity)}>
+        <div className="identity-showcase__header">
+          <GuildIdentityMark identity={data.guild.identity} />
+          <div className="identity-showcase__copy">
+            <span className="page-header__eyebrow">{data.guild.identity.titleLabel}</span>
+            <h2 className="identity-showcase__title">{data.guild.identity.showcaseTitle}</h2>
+            <p className="identity-showcase__subtitle">
+              {data.guild.identity.signatureLabel} · Owner {data.guild.ownerDisplayName}
+            </p>
+          </div>
+        </div>
+        <p className="identity-showcase__motto">«{data.guild.identity.motto}»</p>
+        <p className="identity-showcase__bio">{data.guild.identity.publicBio}</p>
+        <div className="identity-showcase__chips">
+          <Pill tone="accent">{data.guild.identity.titleLabel}</Pill>
+          <Pill tone="success">{data.guild.identity.crestLabel}</Pill>
+          <Pill tone="neutral">{data.guild.identity.colorLabel}</Pill>
+          <Pill tone={data.guild.isCurrentContext ? "success" : "accent"}>
+            {data.guild.isCurrentContext ? "Ваш дом" : "Public showcase"}
+          </Pill>
+        </div>
+        <div className="identity-inline-summary">
+          <span>{data.guild.socialSummary}</span>
+          <span>{data.guild.pveLabel}</span>
+          <span>{data.guild.marketUnlocked ? "Market open" : "Market locked"}</span>
+          <span>{data.guild.tradeUnlocked ? "Deals open" : "Deals locked"}</span>
+        </div>
+      </section>
 
       <Notice tone={data.guild.isCurrentContext ? "success" : "accent"}>
         {data.guild.isCurrentContext
@@ -280,15 +310,24 @@ export default async function GuildPublicProfilePage({
 
         <SectionCard
           title="Social identity snapshot"
-          description="Профиль не декоративный: он объясняет, кто владеет гильдией, почему ей доверяют и где именно она набирает social prestige."
+          description="Identity теперь не скрыта в настройках: profile сразу показывает framing дома, crest/theme и public copy, по которым его запоминают другие игроки."
           aside={<Pill tone={data.prestige.tone}>{data.prestige.tierLabel}</Pill>}
         >
           <div className="stack-sm">
             <article className="row-card">
               <div>
-                <div className="row-card__title">{data.guild.ownerDisplayName}</div>
+                <div className="row-card__title row-card__title--with-mark">
+                  <GuildIdentityMark identity={data.guild.identity} compact />
+                  <span>{data.guild.ownerDisplayName}</span>
+                </div>
                 <p className="row-card__description">
                   Основатель гильдии с {formatDateTime(data.guild.ownerSince)}
+                  <br />
+                  {data.guild.identity.titleDescription}
+                  <br />
+                  {data.guild.identity.crestDescription}
+                  <br />
+                  {data.guild.identity.colorDescription}
                   <br />
                   {data.prestige.summary}
                   <br />
@@ -300,6 +339,9 @@ export default async function GuildPublicProfilePage({
                 </p>
               </div>
               <div className="row-card__aside">
+                <Pill tone="accent">{data.guild.identity.titleLabel}</Pill>
+                <Pill tone="success">{data.guild.identity.crestLabel}</Pill>
+                <Pill tone="neutral">{data.guild.identity.colorLabel}</Pill>
                 {data.prestige.badges.map((badge) => (
                   <Pill key={badge.key} tone={badge.tone}>{badge.label}</Pill>
                 ))}

@@ -42,6 +42,11 @@ import {
   MARKET_RULE_SUMMARY,
   TRADE_RULE_SUMMARY,
 } from "@/lib/domain";
+import {
+  buildGuildIdentityEditorSnapshot,
+  type GuildIdentityEditorSnapshot,
+  type GuildIdentitySnapshot,
+} from "@/lib/guild-identity";
 import { prisma } from "@/lib/prisma";
 import {
   describeFoundationError,
@@ -836,6 +841,7 @@ export type DashboardPageData = {
       pendingClaims: number;
     };
     nextLevelXp: number | null;
+    identity: GuildIdentitySnapshot;
   };
   activeExpeditions: Array<{
     id: string;
@@ -924,6 +930,7 @@ export type DashboardPageData = {
   };
   onboarding: OnboardingSnapshot;
   guildPrestige: GuildPrestigeSummary | null;
+  guildIdentityEditor: GuildIdentityEditorSnapshot;
   watchlist: GuildWatchlistSnapshot;
   followedGuilds: WatchlistGuildCard[];
   suggestedGuilds: WatchlistGuildCard[];
@@ -5344,6 +5351,11 @@ export async function getDashboardPageData(): Promise<FoundationResult<Dashboard
       worldEventBoard,
     });
     const guildPrestige = socialDashboard.currentGuildPrestige;
+    const guildIdentityEditor = buildGuildIdentityEditorSnapshot({
+      guildName: freshGuild.name,
+      guildTag: freshGuild.tag,
+      state: freshGuild.identityState,
+    });
 
     const upgradeLevels = mapManagedGuildUpgradeLevels(guildUpgrades);
     const nextUpgrade = getNextMarketUpgrade(upgradeLevels[GuildUpgradeType.MARKET_SLOTS]);
@@ -5537,6 +5549,7 @@ export async function getDashboardPageData(): Promise<FoundationResult<Dashboard
           pendingClaims: pendingClaimsCount,
         },
         nextLevelXp: getNextLevelXp(freshGuild.level),
+        identity: freshGuild.identity,
       },
       activeExpeditions: activeExpeditions.map((expedition) => {
         const profile = getLocationProfile(expedition.location.code);
@@ -5620,6 +5633,7 @@ export async function getDashboardPageData(): Promise<FoundationResult<Dashboard
       },
       onboarding,
       guildPrestige,
+      guildIdentityEditor,
       watchlist: socialDashboard.watchlist,
       followedGuilds: socialDashboard.followedGuilds,
       suggestedGuilds: socialDashboard.suggestedGuilds,

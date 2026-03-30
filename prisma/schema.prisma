@@ -239,6 +239,11 @@ model Guild {
   tradeUnlockedAt        DateTime?
   marketSlotsBase        Int                  @default(1)
   activeHeroSlots        Int                  @default(3)
+  publicTitleKey         String               @default("guild-house")
+  crestKey               String               @default("ledger")
+  signatureColorKey      String               @default("dawn")
+  motto                  String               @default("Contracts remembered, promises kept.")
+  publicBio              String               @default("A house building its name through expeditions, contracts, and steady market discipline.")
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @updatedAt
   user                   User                 @relation(fields: [userId], references: [id], onDelete: Cascade)

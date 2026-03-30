@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { GuildIdentityMark } from "@/components/guild-identity";
+import type { GuildIdentitySnapshot } from "@/lib/guild-identity";
 import { APP_NAME, APP_NAVIGATION, FOUNDATION_STAGE_LABEL } from "@/lib/domain";
 import {
   logout,
@@ -25,6 +27,7 @@ type DemoGuildShellItem = {
   tradeUnlocked: boolean;
   focusLabel: string;
   isDefault: boolean;
+  identity: GuildIdentitySnapshot;
 };
 
 type AppShellProps = {
@@ -145,7 +148,7 @@ export function AppShell({ children, shellContext }: AppShellProps) {
                 {shellContext.mode === "authenticated"
                   ? "Рынок, сделки, ростер, seasonal board и metaprogression читаются строго от лица вашей гильдии без глобального demo fallback."
                   : activeDemoGuild
-                    ? "Sandbox переключает те же экраны между managed demo-гильдиями для двухсторонней проверки рынка, seasonal standings и barter-loop-а."
+                    ? `${activeDemoGuild.identity.titleLabel} · ${activeDemoGuild.identity.bannerLabel} · «${activeDemoGuild.identity.motto}».`
                     : shellContext.demoContext.error ?? "Список управляемых гильдий появится после `npm run db:setup`."}
               </p>
             </div>
@@ -173,15 +176,22 @@ export function AppShell({ children, shellContext }: AppShellProps) {
                       <input type="hidden" name="redirectTo" value={redirectTo} />
 
                       <div className="guild-switcher__header">
-                        <strong>
-                          {guild.name} [{guild.tag}]
-                        </strong>
+                        <div className="row-card__title row-card__title--with-mark">
+                          <GuildIdentityMark identity={guild.identity} compact />
+                          <strong>
+                            {guild.name} [{guild.tag}]
+                          </strong>
+                        </div>
                         <span className={`pill ${isActive ? "pill--success" : "pill--accent"}`}>
                           {isActive ? "Активна" : guild.isDefault ? "Default" : "Managed"}
                         </span>
                       </div>
 
                       <div className="guild-switcher__meta">
+                        <span>
+                          {guild.identity.titleLabel} · {guild.identity.bannerLabel}
+                        </span>
+                        <span>«{guild.identity.motto}»</span>
                         <span>
                           Lv. {guild.level} · {guild.gold.toLocaleString("ru-RU")} зол. · {guild.heroCount} гер. · инвентарь {guild.inventoryCount}
                         </span>

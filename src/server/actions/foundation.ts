@@ -40,6 +40,7 @@ import { createStarterAccount } from "@/server/bootstrap";
 import {
   describeFoundationError,
   getActiveDemoGuildIdentity,
+  saveGuildIdentityForCurrentContext,
   setActivePlayContext,
   setActiveDemoGuildTag,
 } from "@/server/foundation";
@@ -108,6 +109,11 @@ function buildRedirectUrl(path: string, tone: StatusTone, message: string) {
 function readString(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function readRawString(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return typeof value === "string" ? value : null;
 }
 
 function readEmail(formData: FormData, key: string) {
@@ -538,6 +544,33 @@ export async function clearGuildDiplomacy(formData: FormData) {
     revalidatePath(`/guilds/${encodeURIComponent(result.guildTag)}`);
     revalidatePath(redirectPath);
     message = `${result.guildName} [${result.guildTag}] возвращена в neutral relation для ${result.currentGuildTag}.`;
+  } catch (error) {
+    tone = "danger";
+    message = describeFoundationError(error);
+  }
+
+  redirect(buildRedirectUrl(redirectPath, tone, message));
+}
+
+export async function saveGuildIdentity(formData: FormData) {
+  const redirectPath = getRedirectPath(formData, "/dashboard");
+  let tone: StatusTone = "success";
+  let message = "";
+
+  try {
+    const updatedGuild = await saveGuildIdentityForCurrentContext({
+      publicTitleKey: readRawString(formData, "publicTitleKey"),
+      crestKey: readRawString(formData, "crestKey"),
+      signatureColorKey: readRawString(formData, "signatureColorKey"),
+      motto: readRawString(formData, "motto"),
+      publicBio: readRawString(formData, "publicBio"),
+    });
+
+    revalidatePath("/", "layout");
+    revalidateMany(["/dashboard", "/guilds"]);
+    revalidatePath(`/guilds/${encodeURIComponent(updatedGuild.tag)}`);
+    revalidatePath(redirectPath);
+    message = `${updatedGuild.name} [${updatedGuild.tag}] обновила identity: ${updatedGuild.identity.titleLabel} · ${updatedGuild.identity.bannerLabel}.`;
   } catch (error) {
     tone = "danger";
     message = describeFoundationError(error);

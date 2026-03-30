@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { GuildIdentityMark, getGuildIdentitySurfaceStyle } from "@/components/guild-identity";
 import { GuildDiplomacyControls } from "@/components/guild-diplomacy-controls";
 import { GuildWatchToggle } from "@/components/guild-watch-toggle";
 import { EmptyState, InfoCard, Notice, PageHeader, Pill, SectionCard } from "@/components/ui";
@@ -18,6 +19,7 @@ import {
   claimExpeditionRewards,
   claimWorldEventReward,
   purchaseGuildUpgrade,
+  saveGuildIdentity,
 } from "@/server/actions/foundation";
 import { getAppShellContext } from "@/server/foundation";
 import { getDashboardPageData } from "@/server/game";
@@ -121,7 +123,7 @@ export default async function DashboardPage({
       </Notice>
 
       <Notice tone="success">
-        Социальный слой уже включён: эту гильдию можно открыть как public profile, сравнить с другими в `/guilds` и использовать как мягкий вход в рынок и private deals.
+        Социальный слой уже включён: эту гильдию можно открыть как public profile, сравнить с другими в `/guilds` и теперь быстро настроить её identity без тяжёлого theme-builder-а.
       </Notice>
 
       {data.guildPrestige ? (
@@ -157,6 +159,121 @@ export default async function DashboardPage({
           Сейчас открыт demo sandbox: onboarding board читает состояние активной seeded-гильдии и может быть уже частично пройден, но не мешает multi-guild switching и локальной диагностике.
         </Notice>
       ) : null}
+
+      <SectionCard
+        title="Guild identity / public showcase"
+        description="Быстрый слой house customization: выберите public title, crest theme, signature color и обновите slogan с hall description, чтобы профиль и каталог выглядели по-настоящему вашими."
+        aside={<Pill tone="accent">{data.guild.identity.titleLabel}</Pill>}
+      >
+        <div className="content-grid content-grid--two-thirds">
+          <article className="identity-showcase identity-editor-preview" style={getGuildIdentitySurfaceStyle(data.guild.identity)}>
+            <div className="identity-showcase__header">
+              <GuildIdentityMark identity={data.guild.identity} />
+              <div className="identity-showcase__copy">
+                <span className="page-header__eyebrow">{data.guild.identity.bannerLabel}</span>
+                <div className="identity-showcase__title">{data.guild.identity.showcaseTitle}</div>
+                <p className="identity-showcase__subtitle">{data.guild.identity.signatureLabel}</p>
+              </div>
+            </div>
+            <p className="identity-showcase__motto">«{data.guild.identity.motto}»</p>
+            <p className="identity-showcase__bio">{data.guild.identity.publicBio}</p>
+            <div className="identity-showcase__chips">
+              <Pill tone="accent">{data.guild.identity.titleLabel}</Pill>
+              <Pill tone="success">{data.guild.identity.crestLabel}</Pill>
+              <Pill tone="neutral">{data.guild.identity.colorLabel}</Pill>
+            </div>
+            <div className="identity-inline-summary">
+              <span>{data.guildPrestige?.prestige.summary ?? data.guild.identity.publicBio}</span>
+              <span>{data.guildPrestige?.prestige.tierLabel ?? "Rising guild"}</span>
+              <span>{data.guildPrestige?.renown.tierLabel ?? "New contact"}</span>
+            </div>
+            <div className="button-row">
+              <Link className="button button--ghost" href={`/guilds/${encodeURIComponent(data.guild.tag)}`}>
+                Открыть public profile
+              </Link>
+              <Link className="button button--ghost" href="/guilds">
+                Смотреть каталог
+              </Link>
+            </div>
+          </article>
+
+          <form action={saveGuildIdentity} className="card-form identity-editor-form">
+            <input type="hidden" name="redirectTo" value="/dashboard" />
+
+            <Notice tone="accent">
+              Titles задают framing дома, crest theme работает как архетип house-mark, а signature color окрашивает public showcase без asset pipeline и image upload-а.
+            </Notice>
+
+            <div className="form-grid form-grid--3">
+              <label className="form-field">
+                <span className="form-field__label">Public title</span>
+                <select name="publicTitleKey" defaultValue={data.guildIdentityEditor.current.publicTitleKey}>
+                  {data.guildIdentityEditor.titleOptions.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="form-help">Определяет, как дом подписан в profile и directory.</span>
+              </label>
+
+              <label className="form-field">
+                <span className="form-field__label">Crest theme</span>
+                <select name="crestKey" defaultValue={data.guildIdentityEditor.current.crestKey}>
+                  {data.guildIdentityEditor.crestOptions.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="form-help">Лёгкий house-mark для узнаваемости без редактора изображений.</span>
+              </label>
+
+              <label className="form-field">
+                <span className="form-field__label">Signature color</span>
+                <select name="signatureColorKey" defaultValue={data.guildIdentityEditor.current.signatureColorKey}>
+                  {data.guildIdentityEditor.colorOptions.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="form-help">Подкрашивает витрину каталога, profile hero и switcher в sandbox.</span>
+              </label>
+            </div>
+
+            <label className="form-field">
+              <span className="form-field__label">House slogan</span>
+              <input
+                name="motto"
+                type="text"
+                maxLength={data.guildIdentityEditor.constraints.mottoMaxLength}
+                defaultValue={data.guildIdentityEditor.current.motto}
+              />
+              <span className="form-help">Короткая строка для public hero card и social cues в каталоге.</span>
+            </label>
+
+            <label className="form-field">
+              <span className="form-field__label">Public hall description</span>
+              <textarea
+                name="publicBio"
+                maxLength={data.guildIdentityEditor.constraints.publicBioMaxLength}
+                defaultValue={data.guildIdentityEditor.current.publicBio}
+              />
+              <span className="form-help">1–2 предложения о характере дома, его роли и стиле присутствия в мире.</span>
+            </label>
+
+            <div className="button-row">
+              <button className="button button--primary" type="submit">
+                Сохранить identity
+              </button>
+              <Link className="button button--ghost" href={`/guilds/${encodeURIComponent(data.guild.tag)}`}>
+                Проверить витрину
+              </Link>
+            </div>
+          </form>
+        </div>
+      </SectionCard>
 
       <SectionCard
         title="World event / seasonal board"
@@ -594,12 +711,23 @@ export default async function DashboardPage({
         <div className="stack-sm">
           {data.followedGuilds.length > 0 ? (
             data.followedGuilds.map((guild) => (
-              <article key={`watch-${guild.guildId}`} className="row-card">
+              <article
+                key={`watch-${guild.guildId}`}
+                className="row-card"
+                style={getGuildIdentitySurfaceStyle(guild.identity)}
+              >
                 <div>
-                  <div className="row-card__title">
-                    {guild.guildName} [{guild.guildTag}]
+                  <div className="row-card__title row-card__title--with-mark">
+                    <GuildIdentityMark identity={guild.identity} compact />
+                    <span>
+                      {guild.guildName} [{guild.guildTag}]
+                    </span>
                   </div>
                   <p className="row-card__description">
+                    {guild.identity.titleLabel} · {guild.identity.bannerLabel}
+                    <br />
+                    «{guild.identity.motto}»
+                    <br />
                     {guild.watchReasonLabel} · {guild.watchReasonDetail}
                     <br />
                     {guild.renown.tierLabel} · {guild.renown.score} renown · {guild.prestige.tierLabel}
@@ -634,12 +762,23 @@ export default async function DashboardPage({
             <div className="stack-sm">
               <div className="row-card__title">Suggested guilds to watch</div>
               {data.suggestedGuilds.map((guild) => (
-                <article key={`suggested-${guild.guildId}`} className="row-card">
+                <article
+                  key={`suggested-${guild.guildId}`}
+                  className="row-card"
+                  style={getGuildIdentitySurfaceStyle(guild.identity)}
+                >
                   <div>
-                    <div className="row-card__title">
-                      {guild.guildName} [{guild.guildTag}]
+                    <div className="row-card__title row-card__title--with-mark">
+                      <GuildIdentityMark identity={guild.identity} compact />
+                      <span>
+                        {guild.guildName} [{guild.guildTag}]
+                      </span>
                     </div>
                     <p className="row-card__description">
+                      {guild.identity.titleLabel} · {guild.identity.bannerLabel}
+                      <br />
+                      «{guild.identity.motto}»
+                      <br />
                       {guild.watchReasonLabel}
                       <br />
                       {guild.watchReasonDetail}

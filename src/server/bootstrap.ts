@@ -16,6 +16,7 @@ import {
 } from "@prisma/client";
 
 import { STARTER_ARCHETYPES } from "@/lib/domain";
+import { pickStarterGuildIdentity } from "@/lib/guild-identity";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, normalizeCredentialsEmail } from "@/server/auth";
 
@@ -161,10 +162,12 @@ export async function createStarterAccount(input: StarterAccountInput) {
       throw new Error("Аккаунт с таким email уже существует.");
     }
 
+    const guildName = input.guildName.trim();
     const [itemDefinitions, guildTag] = await Promise.all([
       ensureStarterItemDefinitionsTx(tx),
       allocateGuildTagTx(tx, input.guildName, email),
     ]);
+    const starterIdentity = pickStarterGuildIdentity({ guildName, guildTag });
 
     const now = new Date();
     const user = await tx.user.create({
@@ -180,7 +183,7 @@ export async function createStarterAccount(input: StarterAccountInput) {
     const guild = await tx.guild.create({
       data: {
         userId: user.id,
-        name: input.guildName.trim(),
+        name: guildName,
         tag: guildTag,
         level: STARTER_GUILD_SETUP.level,
         xp: STARTER_GUILD_SETUP.xp,
@@ -189,6 +192,11 @@ export async function createStarterAccount(input: StarterAccountInput) {
         tradeUnlockedAt: now,
         marketSlotsBase: STARTER_GUILD_SETUP.marketSlotsBase,
         activeHeroSlots: STARTER_GUILD_SETUP.activeHeroSlots,
+        publicTitleKey: starterIdentity.publicTitleKey,
+        crestKey: starterIdentity.crestKey,
+        signatureColorKey: starterIdentity.signatureColorKey,
+        motto: starterIdentity.motto,
+        publicBio: starterIdentity.publicBio,
       },
     });
 

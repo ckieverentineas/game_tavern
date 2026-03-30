@@ -9,6 +9,15 @@ import {
   MANAGED_DEMO_GUILD_TAGS,
   type ManagedDemoGuildTag,
 } from "@/lib/domain";
+import {
+  buildGuildIdentitySnapshot,
+  isGuildIdentityColorKey,
+  isGuildIdentityCrestKey,
+  isGuildIdentityTitleKey,
+  resolveGuildIdentityState,
+  type GuildIdentitySnapshot,
+  type GuildIdentityState,
+} from "@/lib/guild-identity";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSessionViewer, type SessionViewer } from "@/server/auth";
 
@@ -45,6 +54,11 @@ const demoGuildIdentitySelect = {
   tradeUnlockedAt: true,
   marketSlotsBase: true,
   activeHeroSlots: true,
+  publicTitleKey: true,
+  crestKey: true,
+  signatureColorKey: true,
+  motto: true,
+  publicBio: true,
   user: {
     select: {
       displayName: true,
@@ -84,6 +98,8 @@ export type DemoGuildIdentity = {
     inventoryItems: number;
     marketClaims: number;
   };
+  identityState: GuildIdentityState;
+  identity: GuildIdentitySnapshot;
 };
 
 export type DemoShellContext = {
@@ -103,6 +119,7 @@ export type DemoShellContext = {
     tradeUnlocked: boolean;
     focusLabel: string;
     isDefault: boolean;
+    identity: GuildIdentitySnapshot;
   }>;
 };
 
@@ -131,9 +148,33 @@ function sanitizeWatchlistGuildTags(guildTags: string[]) {
 }
 
 function mapDemoGuildIdentity(guild: DemoGuildIdentityRecord): DemoGuildIdentity {
+  const identityState = resolveGuildIdentityState({
+    publicTitleKey: guild.publicTitleKey,
+    crestKey: guild.crestKey,
+    signatureColorKey: guild.signatureColorKey,
+    motto: guild.motto,
+    publicBio: guild.publicBio,
+  });
+
   return {
-    ...guild,
+    id: guild.id,
+    name: guild.name,
+    tag: guild.tag,
+    level: guild.level,
+    xp: guild.xp,
+    gold: guild.gold,
+    marketUnlockedAt: guild.marketUnlockedAt,
+    tradeUnlockedAt: guild.tradeUnlockedAt,
+    marketSlotsBase: guild.marketSlotsBase,
+    activeHeroSlots: guild.activeHeroSlots,
+    user: guild.user,
     counts: guild._count,
+    identityState,
+    identity: buildGuildIdentitySnapshot({
+      guildName: guild.name,
+      guildTag: guild.tag,
+      state: identityState,
+    }),
   };
 }
 
@@ -296,6 +337,52 @@ export async function getActiveGuildIdentity() {
   return getActiveDemoGuildIdentity();
 }
 
+export async function saveGuildIdentityForCurrentContext(input: {
+  publicTitleKey?: string | null;
+  crestKey?: string | null;
+  signatureColorKey?: string | null;
+  motto?: string | null;
+  publicBio?: string | null;
+}) {
+  const currentGuild = await getActiveGuildIdentity();
+
+  if (input.publicTitleKey && !isGuildIdentityTitleKey(input.publicTitleKey)) {
+    throw new Error("Укажите корректный public title для гильдии.");
+  }
+
+  if (input.crestKey && !isGuildIdentityCrestKey(input.crestKey)) {
+    throw new Error("Укажите корректную crest theme для гильдии.");
+  }
+
+  if (input.signatureColorKey && !isGuildIdentityColorKey(input.signatureColorKey)) {
+    throw new Error("Укажите корректный signature color для гильдии.");
+  }
+
+  const nextIdentityState = resolveGuildIdentityState({
+    publicTitleKey: input.publicTitleKey ?? currentGuild.identityState.publicTitleKey,
+    crestKey: input.crestKey ?? currentGuild.identityState.crestKey,
+    signatureColorKey: input.signatureColorKey ?? currentGuild.identityState.signatureColorKey,
+    motto: input.motto ?? currentGuild.identityState.motto,
+    publicBio: input.publicBio ?? currentGuild.identityState.publicBio,
+  });
+
+  const updatedGuild = await prisma.guild.update({
+    where: {
+      id: currentGuild.id,
+    },
+    data: {
+      publicTitleKey: nextIdentityState.publicTitleKey,
+      crestKey: nextIdentityState.crestKey,
+      signatureColorKey: nextIdentityState.signatureColorKey,
+      motto: nextIdentityState.motto,
+      publicBio: nextIdentityState.publicBio,
+    },
+    select: demoGuildIdentitySelect,
+  });
+
+  return mapDemoGuildIdentity(updatedGuild);
+}
+
 export async function setActiveDemoGuildTag(guildTag: string) {
   if (!isManagedDemoGuildTag(guildTag)) {
     throw new Error("Можно выбрать только управляемую demo-гильдию из switcher-а.");
@@ -455,6 +542,7 @@ export async function getDemoShellContext(): Promise<DemoShellContext> {
         tradeUnlocked: Boolean(guild.tradeUnlockedAt),
         focusLabel: MANAGED_DEMO_GUILD_FOCUS_LABELS[guild.tag as ManagedDemoGuildTag],
         isDefault: guild.tag === DEMO_GUILD_TAG,
+        identity: guild.identity,
       })),
     };
   } catch (error) {

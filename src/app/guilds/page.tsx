@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { GuildIdentityMark, getGuildIdentitySurfaceStyle } from "@/components/guild-identity";
 import { GuildDiplomacyControls } from "@/components/guild-diplomacy-controls";
 import { GuildWatchToggle } from "@/components/guild-watch-toggle";
 import { InfoCard, Notice, PageHeader, Pill, SectionCard } from "@/components/ui";
@@ -168,18 +169,30 @@ export default async function GuildDirectoryPage({
         <div className="stack-sm">
           {data.followedGuilds.length > 0 ? (
             data.followedGuilds.map((guild) => (
-              <article key={`followed-${guild.guildId}`} className="row-card">
+              <article
+                key={`followed-${guild.guildId}`}
+                className="row-card"
+                style={getGuildIdentitySurfaceStyle(guild.identity)}
+              >
                 <div>
-                  <div className="row-card__title">
-                    {guild.guildName} [{guild.guildTag}]
+                  <div className="row-card__title row-card__title--with-mark">
+                    <GuildIdentityMark identity={guild.identity} compact />
+                    <span>
+                      {guild.guildName} [{guild.guildTag}]
+                    </span>
                   </div>
                   <p className="row-card__description">
+                    {guild.identity.titleLabel} · {guild.identity.bannerLabel}
+                    <br />
+                    «{guild.identity.motto}»
+                    <br />
                     {guild.watchReasonLabel}
                     <br />
                     {guild.watchReasonDetail}
                   </p>
                 </div>
                 <div className="row-card__aside">
+                  <Pill tone="accent">{guild.identity.colorLabel}</Pill>
                   <Pill tone={guild.renown.tone}>{guild.renown.tierLabel}</Pill>
                   <GuildWatchToggle guildTag={guild.guildTag} isWatched={true} redirectTo="/guilds" />
                   <Link className="button button--ghost" href={guild.profileHref}>
@@ -194,12 +207,23 @@ export default async function GuildDirectoryPage({
             <div className="stack-sm">
               <div className="row-card__title">Suggested guilds to watch</div>
               {data.suggestedGuilds.map((guild) => (
-                <article key={`watch-suggestion-${guild.guildId}`} className="row-card">
+                <article
+                  key={`watch-suggestion-${guild.guildId}`}
+                  className="row-card"
+                  style={getGuildIdentitySurfaceStyle(guild.identity)}
+                >
                   <div>
-                    <div className="row-card__title">
-                      {guild.guildName} [{guild.guildTag}]
+                    <div className="row-card__title row-card__title--with-mark">
+                      <GuildIdentityMark identity={guild.identity} compact />
+                      <span>
+                        {guild.guildName} [{guild.guildTag}]
+                      </span>
                     </div>
                     <p className="row-card__description">
+                      {guild.identity.titleLabel} · {guild.identity.bannerLabel}
+                      <br />
+                      «{guild.identity.motto}»
+                      <br />
                       {guild.watchReasonLabel}
                       <br />
                       {guild.watchReasonDetail}
@@ -264,16 +288,29 @@ export default async function GuildDirectoryPage({
 
       <SectionCard
         title="Каталог гильдий"
-        description="Каждая гильдия получает prestige-витрину: tier, badges, trusted-status, видимые social proofs и мягкие CTA в уже существующие loops."
+        description="Каждая гильдия получает своё лицо: public title, crest theme, signature color, motto и hall description теперь работают как быстрые identity cues для каталога и social discovery."
       >
         <div className="stack-sm">
           {data.guilds.map((guild) => (
-            <article key={guild.guildId} className="row-card">
+            <article
+              key={guild.guildId}
+              className="row-card"
+              style={getGuildIdentitySurfaceStyle(guild.identity)}
+            >
               <div>
-                <div className="row-card__title">
-                  {guild.guildName} [{guild.guildTag}]
+                <div className="row-card__title row-card__title--with-mark">
+                  <GuildIdentityMark identity={guild.identity} compact />
+                  <span>
+                    {guild.guildName} [{guild.guildTag}]
+                  </span>
                 </div>
                 <p className="row-card__description">
+                  {guild.identity.titleLabel} · {guild.identity.signatureLabel}
+                  <br />
+                  «{guild.identity.motto}»
+                  <br />
+                  {guild.identity.publicBio}
+                  <br />
                   Owner: {guild.ownerDisplayName}
                   <br />
                   {guild.renown.tierLabel} · {guild.renown.score} renown · rank #{guild.renown.rank}/{guild.renown.total}
@@ -302,6 +339,9 @@ export default async function GuildDirectoryPage({
                 </p>
               </div>
               <div className="row-card__aside">
+                <Pill tone="accent">{guild.identity.titleLabel}</Pill>
+                <Pill tone="success">{guild.identity.crestLabel}</Pill>
+                <Pill tone="neutral">{guild.identity.colorLabel}</Pill>
                 <Pill tone={guild.renown.tone}>{guild.renown.tierLabel}</Pill>
                 {guild.renown.primaryPerkLabel ? <Pill tone="success">{guild.renown.primaryPerkLabel}</Pill> : null}
                 <Pill tone={guild.prestige.tone}>{guild.prestige.tierLabel}</Pill>
