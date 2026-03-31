@@ -164,6 +164,9 @@ enum EconomyEventType {
   WORKSHOP_UPGRADE
   CONTRACT_REWARD
   WORLD_EVENT_REWARD
+  GUILD_AID_SENT
+  GUILD_AID_RECEIVED
+  GUILD_AID_CANCELLED
   SEED
 }
 
@@ -176,6 +179,7 @@ enum ReferenceType {
   BUY_ORDER
   TRADE_OFFER
   GUILD_UPGRADE
+  GUILD_AID
 }
 
 enum AuditSourceType {
@@ -200,6 +204,12 @@ enum AuditSeverity {
 enum GuildDiplomacyStance {
   ENDORSEMENT
   RIVALRY
+}
+
+enum GuildAidPackageStatus {
+  PENDING
+  CLAIMED
+  CANCELLED
 }
 
 model User {
@@ -265,6 +275,8 @@ model Guild {
   watchlistEntries       GuildWatchlistEntry[]
   outgoingDiplomacyRelations GuildDiplomacyRelation[] @relation("GuildDiplomacySource")
   incomingDiplomacyRelations GuildDiplomacyRelation[] @relation("GuildDiplomacyTarget")
+  outgoingAidPackages    GuildAidPackage[]     @relation("GuildAidSender")
+  incomingAidPackages    GuildAidPackage[]     @relation("GuildAidReceiver")
 }
 
 model GuildWatchlistEntry {
@@ -293,6 +305,27 @@ model GuildDiplomacyRelation {
   @@unique([sourceGuildId, targetGuildId])
   @@index([sourceGuildId, stance])
   @@index([targetGuildId, stance])
+}
+
+model GuildAidPackage {
+  id              String                @id @default(cuid())
+  senderGuildId   String
+  receiverGuildId String
+  resourceType    ResourceType
+  quantity        Int                   @default(1)
+  note            String?
+  courierFeeGold  Int                   @default(0)
+  status          GuildAidPackageStatus @default(PENDING)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  claimedAt       DateTime?
+  cancelledAt     DateTime?
+  senderGuild     Guild                 @relation("GuildAidSender", fields: [senderGuildId], references: [id], onDelete: Cascade)
+  receiverGuild   Guild                 @relation("GuildAidReceiver", fields: [receiverGuildId], references: [id], onDelete: Cascade)
+
+  @@index([senderGuildId, status, createdAt])
+  @@index([receiverGuildId, status, createdAt])
+  @@index([status, createdAt])
 }
 
 model Hero {

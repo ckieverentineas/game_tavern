@@ -15,6 +15,8 @@ import {
   readActionFeedback,
 } from "@/lib/format";
 import {
+  cancelGuildAid,
+  claimGuildAid,
   claimGuildContract,
   claimExpeditionRewards,
   claimWorldEventReward,
@@ -57,6 +59,7 @@ export default async function DashboardPage({
   const pendingExpeditionClaims = data.claimableExpeditions.length;
   const pendingTradeActions = data.inbox.pending.filter((entry) => entry.kind === "trade-offer").length;
   const pendingMarketActions = data.inbox.pending.filter((entry) => entry.kind === "market-claim").length;
+  const pendingAidActions = data.inbox.pending.filter((entry) => entry.kind === "guild-aid").length;
   const pendingWorldEventRewards = data.inbox.pending.filter((entry) => entry.kind === "world-event-reward").length;
   const contractBoard = data.contractBoard;
   const worldEventBoard = data.worldEventBoard;
@@ -144,6 +147,10 @@ export default async function DashboardPage({
           <strong>{data.guildPrestige.diplomacy.statusLabel}.</strong> {data.guildPrestige.diplomacy.spotlight}
         </Notice>
       ) : null}
+
+      <Notice tone={data.courier.tone}>
+        <strong>{data.courier.statusLabel}.</strong> {data.courier.summary} {data.courier.spotlight}
+      </Notice>
 
       <Notice tone="accent">
         <strong>{worldEventBoard.season.label}.</strong> {worldEventBoard.season.summary} Сейчас видно
@@ -451,7 +458,7 @@ export default async function DashboardPage({
         <InfoCard
           title="Actionable inbox"
           value={data.inbox.pending.length}
-          detail={`${pendingWorldEventRewards} seasonal reward, ${pendingExpeditionClaims} expedition claim, ${pendingMarketActions} market / request outcome и ${pendingTradeActions} входящих сделки требуют внимания.`}
+          detail={`${pendingWorldEventRewards} seasonal reward, ${pendingExpeditionClaims} expedition claim, ${pendingMarketActions} market / request outcome, ${pendingAidActions} courier package и ${pendingTradeActions} входящих сделки требуют внимания.`}
           tone="success"
         />
         <InfoCard
@@ -882,10 +889,134 @@ export default async function DashboardPage({
         </SectionCard>
       ) : null}
 
+      <SectionCard
+        title="Friendly courier packages"
+        description={data.courier.summary}
+        aside={
+          <Pill tone={data.courier.incomingPendingCount > 0 ? "success" : data.courier.outgoingPendingCount > 0 ? "accent" : "neutral"}>
+            {`${data.courier.incomingPendingCount} incoming · ${data.courier.outgoingPendingCount} outgoing`}
+          </Pill>
+        }
+      >
+        <div className="stack-sm">
+          <Notice tone={data.courier.tone}>{data.courier.spotlight}</Notice>
+
+          {data.courier.incoming.length > 0 ? (
+            <div className="stack-sm">
+              <div className="row-card__title">Incoming aid</div>
+              {data.courier.incoming.map((entry) => (
+                <article key={`incoming-aid-${entry.id}`} className="row-card">
+                  <div>
+                    <div className="row-card__title">
+                      {entry.counterpartyGuildName} [{entry.counterpartyGuildTag}]
+                    </div>
+                    <p className="row-card__description">
+                      {entry.payloadLabel}
+                      <br />
+                      {entry.note ?? "Без записки: пакет оформлен как тихая поддержка знакомого дома."}
+                      <br />
+                      {entry.statusLabel} · courier fee {entry.courierFeeGold} зол. уже удержан отправителем.
+                    </p>
+                  </div>
+                  <div className="row-card__aside">
+                    <Pill tone={entry.tone}>{entry.directionLabel}</Pill>
+                    <span className="muted">{formatDateTime(entry.createdAt)}</span>
+                    {entry.canClaim ? (
+                      <form action={claimGuildAid} className="inline-form">
+                        <input type="hidden" name="aidId" value={entry.id} />
+                        <input type="hidden" name="redirectTo" value="/dashboard" />
+                        <button className="button button--primary" type="submit">
+                          Claim aid
+                        </button>
+                      </form>
+                    ) : null}
+                    <Link className="button button--ghost" href={entry.counterpartyProfileHref}>
+                      Профиль дома
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : null}
+
+          {data.courier.outgoing.length > 0 ? (
+            <div className="stack-sm">
+              <div className="row-card__title">Outgoing aid</div>
+              {data.courier.outgoing.map((entry) => (
+                <article key={`outgoing-aid-${entry.id}`} className="row-card">
+                  <div>
+                    <div className="row-card__title">
+                      {entry.counterpartyGuildName} [{entry.counterpartyGuildTag}]
+                    </div>
+                    <p className="row-card__description">
+                      {entry.payloadLabel}
+                      <br />
+                      {entry.note ?? "Без записки: отправка оформлена как тихий пакет снабжения."}
+                      <br />
+                      {entry.statusLabel} · courier fee {entry.courierFeeGold} зол.
+                    </p>
+                  </div>
+                  <div className="row-card__aside">
+                    <Pill tone={entry.tone}>{entry.directionLabel}</Pill>
+                    <span className="muted">{formatDateTime(entry.createdAt)}</span>
+                    {entry.canCancel ? (
+                      <form action={cancelGuildAid} className="inline-form">
+                        <input type="hidden" name="aidId" value={entry.id} />
+                        <input type="hidden" name="redirectTo" value="/dashboard" />
+                        <button className="button button--ghost" type="submit">
+                          Отозвать пакет
+                        </button>
+                      </form>
+                    ) : null}
+                    <Link className="button button--ghost" href={entry.counterpartyProfileHref}>
+                      Профиль дома
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : null}
+
+          {data.courier.incoming.length === 0 && data.courier.outgoing.length === 0 ? (
+            <EmptyState
+              title="Courier board пока тих"
+              description="Как только дружественные дома начнут слать или получать мягкие aid packages, история появится здесь и в unified inbox."
+            />
+          ) : null}
+
+          {data.courier.recentHistory.length > 0 ? (
+            <div className="stack-sm">
+              <div className="row-card__title">Recent courier memory</div>
+              {data.courier.recentHistory.map((entry) => (
+                <article key={`aid-history-${entry.id}`} className="row-card">
+                  <div>
+                    <div className="row-card__title">
+                      {entry.directionLabel} · {entry.counterpartyGuildTag}
+                    </div>
+                    <p className="row-card__description">
+                      {entry.payloadLabel}
+                      <br />
+                      {entry.note ?? entry.statusLabel}
+                    </p>
+                  </div>
+                  <div className="row-card__aside">
+                    <Pill tone={entry.tone}>{entry.statusLabel}</Pill>
+                    <span className="muted">{formatDateTime(entry.eventAt)}</span>
+                    <Link className="button button--ghost" href={entry.counterpartyProfileHref}>
+                      Профиль дома
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </SectionCard>
+
       <div className="content-grid content-grid--two-thirds">
         <SectionCard
           title="Unified inbox"
-          description="Одно место для pending social/economy outcomes: claim-ready экспедиции, claim box рынка и request board-а, а также сделки, которые требуют ответа."
+          description="Одно место для pending social/economy outcomes: claim-ready экспедиции, claim box рынка и request board-а, courier packages, а также сделки, которые требуют ответа."
           aside={
             <Pill tone={data.inbox.pending.length > 0 ? "warning" : "success"}>
               {data.inbox.pending.length > 0 ? `${data.inbox.pending.length} action items` : "Inbox чист"}
@@ -910,6 +1041,8 @@ export default async function DashboardPage({
                         ? "Сделка"
                         : entry.kind === "market-claim"
                           ? "Market claim"
+                          : entry.kind === "guild-aid"
+                            ? "Courier aid"
                           : entry.kind === "world-event-reward"
                             ? "Seasonal reward"
                             : "Expedition claim"}

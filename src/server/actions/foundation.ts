@@ -45,6 +45,11 @@ import {
   setActiveDemoGuildTag,
 } from "@/server/foundation";
 import {
+  cancelOutgoingGuildAidForCurrentContext,
+  claimIncomingGuildAidForCurrentContext,
+  sendGuildAidForCurrentContext,
+} from "@/server/guild-aid";
+import {
   clearGuildDiplomacyRelationForCurrentContext,
   endorseGuildForCurrentContext,
   followGuildForCurrentContext,
@@ -544,6 +549,100 @@ export async function clearGuildDiplomacy(formData: FormData) {
     revalidatePath(`/guilds/${encodeURIComponent(result.guildTag)}`);
     revalidatePath(redirectPath);
     message = `${result.guildName} [${result.guildTag}] возвращена в neutral relation для ${result.currentGuildTag}.`;
+  } catch (error) {
+    tone = "danger";
+    message = describeFoundationError(error);
+  }
+
+  redirect(buildRedirectUrl(redirectPath, tone, message));
+}
+
+export async function sendGuildAid(formData: FormData) {
+  const redirectPath = getRedirectPath(formData, "/dashboard");
+  let tone: StatusTone = "success";
+  let message = "";
+
+  try {
+    const guildTag = readString(formData, "guildTag");
+    const resourceTypeValue = readString(formData, "resourceType");
+    const quantity = readPositiveInt(formData, "quantity");
+    const note = readRawString(formData, "note");
+
+    if (!guildTag) {
+      throw new Error("Укажите дружественную гильдию для courier package.");
+    }
+
+    if (!isResourceType(resourceTypeValue)) {
+      throw new Error("Выберите корректный ресурс для aid package.");
+    }
+
+    if (quantity <= 0) {
+      throw new Error("Количество aid package должно быть больше нуля.");
+    }
+
+    const result = await sendGuildAidForCurrentContext({
+      guildTag,
+      resourceType: resourceTypeValue,
+      quantity,
+      note,
+    });
+    revalidatePath("/", "layout");
+    revalidateMany(["/dashboard", "/guilds", "/market", "/deals"]);
+    revalidatePath(`/guilds/${encodeURIComponent(result.guildTag)}`);
+    revalidatePath(redirectPath);
+    message = `Courier package отправлен для ${result.guildName} [${result.guildTag}]: ${result.quantity} × ${result.resourceLabel}.`;
+  } catch (error) {
+    tone = "danger";
+    message = describeFoundationError(error);
+  }
+
+  redirect(buildRedirectUrl(redirectPath, tone, message));
+}
+
+export async function claimGuildAid(formData: FormData) {
+  const redirectPath = getRedirectPath(formData, "/dashboard");
+  let tone: StatusTone = "success";
+  let message = "";
+
+  try {
+    const aidId = readString(formData, "aidId");
+
+    if (!aidId) {
+      throw new Error("Courier package для claim-а не передан.");
+    }
+
+    const result = await claimIncomingGuildAidForCurrentContext(aidId);
+    revalidatePath("/", "layout");
+    revalidateMany(["/dashboard", "/guilds", "/market", "/deals"]);
+    revalidatePath(`/guilds/${encodeURIComponent(result.guildTag)}`);
+    revalidatePath(redirectPath);
+    message = `Friendly aid от ${result.guildName} [${result.guildTag}] забран: ${result.quantity} × ${result.resourceLabel}.`;
+  } catch (error) {
+    tone = "danger";
+    message = describeFoundationError(error);
+  }
+
+  redirect(buildRedirectUrl(redirectPath, tone, message));
+}
+
+export async function cancelGuildAid(formData: FormData) {
+  const redirectPath = getRedirectPath(formData, "/dashboard");
+  let tone: StatusTone = "success";
+  let message = "";
+
+  try {
+    const aidId = readString(formData, "aidId");
+
+    if (!aidId) {
+      throw new Error("Outgoing courier package не передан.");
+    }
+
+    const result = await cancelOutgoingGuildAidForCurrentContext(aidId);
+    revalidatePath("/", "layout");
+    revalidateMany(["/dashboard", "/guilds", "/market", "/deals"]);
+    revalidatePath(`/guilds/${encodeURIComponent(result.guildTag)}`);
+    revalidatePath(redirectPath);
+    message = `Outgoing courier package для ${result.guildName} [${result.guildTag}] отменён; ${result.quantity} × ${result.resourceLabel} возвращено на склад.`;
   } catch (error) {
     tone = "danger";
     message = describeFoundationError(error);

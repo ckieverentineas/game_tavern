@@ -7,6 +7,7 @@ import {
   ExpeditionResultTier,
   EquipmentSlot,
   ExpeditionStatus,
+  GuildAidPackageStatus,
   GuildDiplomacyStance,
   GuildUpgradeType,
   HeroClass,
@@ -35,6 +36,7 @@ const prisma = new PrismaClient();
 async function main() {
   await prisma.authSession.deleteMany();
   await prisma.guildWatchlistEntry.deleteMany();
+  await prisma.guildAidPackage.deleteMany();
   await prisma.guildDiplomacyRelation.deleteMany();
   await prisma.auditFlag.deleteMany();
   await prisma.economyLedgerEntry.deleteMany();
@@ -2564,6 +2566,53 @@ async function main() {
       { guildId: mossGuild.id, resourceType: ResourceType.HERBS, amount: 19 },
       { guildId: mossGuild.id, resourceType: ResourceType.LEATHER, amount: 11 },
       { guildId: mossGuild.id, resourceType: ResourceType.ARCANE_DUST, amount: 4 },
+    ],
+  });
+
+  await prisma.guildAidPackage.createMany({
+    data: [
+      {
+        senderGuildId: demoGuild.id,
+        receiverGuildId: mossGuild.id,
+        resourceType: ResourceType.HERBS,
+        quantity: 4,
+        note: "Держим ваш ранний supply loop тёплым перед следующим выходом.",
+        courierFeeGold: 4,
+        status: GuildAidPackageStatus.PENDING,
+        createdAt: hoursAgo(2.25),
+      },
+      {
+        senderGuildId: cinderGuild.id,
+        receiverGuildId: demoGuild.id,
+        resourceType: ResourceType.ARCANE_DUST,
+        quantity: 2,
+        note: "Небольшой dust refill за ваш прошлый escort support.",
+        courierFeeGold: 4,
+        status: GuildAidPackageStatus.PENDING,
+        createdAt: hoursAgo(3.25),
+      },
+      {
+        senderGuildId: mossGuild.id,
+        receiverGuildId: demoGuild.id,
+        resourceType: ResourceType.LEATHER,
+        quantity: 3,
+        note: "Возвращаем часть кожи после вашего friendly escort пакета.",
+        courierFeeGold: 4,
+        status: GuildAidPackageStatus.CLAIMED,
+        createdAt: hoursAgo(21),
+        claimedAt: hoursAgo(19),
+      },
+      {
+        senderGuildId: demoGuild.id,
+        receiverGuildId: cinderGuild.id,
+        resourceType: ResourceType.IRON_ORE,
+        quantity: 2,
+        note: "Кузница уже закрыта, поэтому маршрут свернули до прибытия.",
+        courierFeeGold: 4,
+        status: GuildAidPackageStatus.CANCELLED,
+        createdAt: hoursAgo(12),
+        cancelledAt: hoursAgo(11),
+      },
     ],
   });
 

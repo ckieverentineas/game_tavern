@@ -46,6 +46,11 @@ import {
   type GuildDiplomacyRelationRow,
   type GuildDiplomacySnapshot,
 } from "@/server/diplomacy";
+import {
+  loadDashboardGuildCourierSnapshot,
+  loadProfileGuildCourierSnapshot,
+  type GuildCourierSnapshot,
+} from "@/server/guild-aid";
 
 export type {
   GuildDiplomacyActivity,
@@ -265,6 +270,7 @@ export type PersonalizedSocialFeedSnapshot = {
 
 export type DashboardSocialSnapshot = {
   currentGuildPrestige: GuildPrestigeSummary | null;
+  courier: GuildCourierSnapshot;
   watchlist: GuildWatchlistSnapshot;
   followedGuilds: WatchlistGuildCard[];
   suggestedGuilds: WatchlistGuildCard[];
@@ -469,6 +475,7 @@ export type GuildPublicProfilePageData = {
   socialMemory: GuildSocialMemoryActivity[];
   favoriteTraders: GuildFavoriteCounterparty[];
   recurringSummary: GuildRecurringInteractionSummary;
+  courier: GuildCourierSnapshot;
   socialCtas: {
     directoryHref: string;
     marketHref: string;
@@ -2785,9 +2792,11 @@ export async function loadDashboardSocialSnapshot(input: {
     currentGuildTag: input.currentGuildTag,
     worldEventBoard: input.worldEventBoard,
   });
+  const courier = await loadDashboardGuildCourierSnapshot(watchContext.currentGuild?.id ?? null);
 
   return {
     currentGuildPrestige: watchContext.currentGuildPrestige,
+    courier,
     watchlist: watchContext.watchlist,
     followedGuilds: watchContext.followedGuilds,
     suggestedGuilds: watchContext.suggestedGuilds,
@@ -3155,8 +3164,17 @@ export async function loadGuildPublicProfilePageData(
     precomputedGuilds: guilds,
     includeFeed: false,
   });
+  const viewerDiplomacy = buildViewerGuildDiplomacy({
+    currentGuild: watchContext.currentGuild,
+    targetGuild: computedGuild,
+  });
 
-  const [guildDetail, soldListings, fulfilledOrders, recentLedgerEntries, recentExpeditions] = await Promise.all([
+  const [courier, guildDetail, soldListings, fulfilledOrders, recentLedgerEntries, recentExpeditions] = await Promise.all([
+    loadProfileGuildCourierSnapshot({
+      currentGuildId: watchContext.currentGuild?.id ?? null,
+      targetGuildId: computedGuild.id,
+      viewerDiplomacy,
+    }),
     prisma.guild.findUnique({
       where: { id: computedGuild.id },
       select: {
@@ -3358,6 +3376,18 @@ export async function loadGuildPublicProfilePageData(
       tone: "success" as const,
       counterpartyGuildTag: order.buyerGuild.tag,
     })),
+    ...courier.recentHistory.map((entry) => ({
+      id: `courier-${entry.id}`,
+      sourceLabel: "Courier",
+      title: entry.isIncoming ? "Получен friendly aid package" : "Отправлен friendly aid package",
+      summary: `${entry.counterpartyGuildName} [${entry.counterpartyGuildTag}] · ${entry.payloadLabel}`,
+      detail: entry.note ?? entry.statusLabel,
+      prestigeImpactLabel: "+friendly aid",
+      at: entry.eventAt,
+      href: entry.counterpartyProfileHref,
+      tone: entry.tone,
+      counterpartyGuildTag: entry.counterpartyGuildTag,
+    })),
     ...recentLedgerEntries.map((entry) => {
       const counterparty = entry.counterpartyGuildId ? counterpartyMap.get(entry.counterpartyGuildId) ?? null : null;
       const counterpartyLabel = counterparty ? `${counterparty.name} [${counterparty.tag}]` : null;
@@ -3462,10 +3492,7 @@ export async function loadGuildPublicProfilePageData(
     prestige: computedGuild.reputation,
     renown: computedGuild.renown,
     diplomacy: computedGuild.diplomacy,
-    viewerDiplomacy: buildViewerGuildDiplomacy({
-      currentGuild: watchContext.currentGuild,
-      targetGuild: computedGuild,
-    }),
+    viewerDiplomacy,
     leaderboardPlacements: buildLeaderboardPlacements(guilds, computedGuild.id),
     featuredHeroes: guildDetail.heroes.map((hero) => ({
       id: hero.id,
@@ -3513,6 +3540,7 @@ export async function loadGuildPublicProfilePageData(
     })),
     favoriteTraders: computedGuild.favoriteCounterparties,
     recurringSummary: computedGuild.recurringSummary,
+    courier,
     socialCtas: {
       directoryHref: "/guilds",
       marketHref: buildGuildMarketContextHref(computedGuild.tag),

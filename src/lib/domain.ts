@@ -21,10 +21,10 @@ export const MANAGED_DEMO_GUILD_TAGS = [
 export type ManagedDemoGuildTag = (typeof MANAGED_DEMO_GUILD_TAGS)[number];
 
 export const MANAGED_DEMO_GUILD_FOCUS_LABELS: Record<ManagedDemoGuildTag, string> = {
-  DEMO: "Trusted house baseline: рынок, контракты, ally endorsements и rivalry-lite already readable.",
+  DEMO: "Trusted house baseline: рынок, контракты, courier aid, ally endorsements и rivalry-lite already readable.",
   RIVL: "Demand broker: плотный рынок, закрытие buy orders и мягкий rivalry pressure на соседей.",
-  CNDR: "Elite explorers: high-risk PvE, public prestige и status endorsements от знакомых домов.",
-  MOSS: "Rising guild: молодой публичный профиль и быстрый social climb через endorsements.",
+  CNDR: "Elite explorers: high-risk PvE, public prestige, soft guild aid memory и status endorsements от знакомых домов.",
+  MOSS: "Rising guild: молодой публичный профиль, mutual endorsements и friendly courier support от знакомых домов.",
 };
 
 export const APP_NAVIGATION = [
@@ -164,6 +164,9 @@ export const FOUNDATION_ACTIONS = [
   "acceptTradeOffer",
   "rejectTradeOffer",
   "cancelTradeOffer",
+  "sendGuildAid",
+  "claimGuildAid",
+  "cancelGuildAid",
   "purchaseGuildUpgrade",
   "claimWorldEventReward",
 ] as const;
@@ -275,6 +278,9 @@ export const ECONOMY_EVENT_LABELS = {
   WORKSHOP_UPGRADE: "Усиление в workshop",
   CONTRACT_REWARD: "Награда по контракту",
   WORLD_EVENT_REWARD: "Награда world event",
+  GUILD_AID_SENT: "Отправка friendly aid",
+  GUILD_AID_RECEIVED: "Получение friendly aid",
+  GUILD_AID_CANCELLED: "Отмена courier package",
   SEED: "Инициализация foundation",
 } as const;
 

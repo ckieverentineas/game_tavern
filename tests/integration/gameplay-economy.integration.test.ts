@@ -1,6 +1,7 @@
 import {
   BuyOrderStatus,
   ExpeditionStatus,
+  GuildAidPackageStatus,
   GuildUpgradeType,
   ListingType,
   MarketClaimSourceType,
@@ -12,6 +13,7 @@ import {
 } from "@prisma/client";
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
 
+import { type ManagedDemoGuildTag } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
 import {
   acceptTradeOfferForDemoGuild,
@@ -36,6 +38,11 @@ import {
   upgradeInventoryItemForDemoGuild,
 } from "@/server/game";
 import {
+  cancelOutgoingGuildAidForCurrentContext,
+  claimIncomingGuildAidForCurrentContext,
+  sendGuildAidForCurrentContext,
+} from "@/server/guild-aid";
+import {
   saveGuildIdentityForCurrentContext,
   setActiveDemoGuildTag,
   setActivePlayContext,
@@ -51,12 +58,12 @@ import { disconnectTestDatabase, resetTestDatabase } from "../helpers/test-db";
 import { unwrapFoundationResult } from "../helpers/result";
 import { resetMockCookies } from "../mocks/next-headers";
 
-async function setDemoContext(guildTag: "DEMO" | "RIVL") {
+async function setDemoContext(guildTag: ManagedDemoGuildTag) {
   await setActiveDemoGuildTag(guildTag);
   await setActivePlayContext("demo");
 }
 
-async function requireGuildId(guildTag: "DEMO" | "RIVL") {
+async function requireGuildId(guildTag: ManagedDemoGuildTag) {
   const guild = await prisma.guild.findUnique({
     where: { tag: guildTag },
     select: { id: true },
@@ -346,6 +353,90 @@ describe("gameplay/economy integration", () => {
     });
     expect(worldEventRewardMessage).toContain("Forge Drive");
 
+    const aidSendResult = await sendGuildAidForCurrentContext({
+      guildTag: "MOSS",
+      resourceType: ResourceType.HERBS,
+      quantity: 3,
+      note: "Держим ваш ранний supply run тёплым перед следующим выходом.",
+    });
+    expect(aidSendResult.status).toBe("pending");
+
+    const outgoingAid = await prisma.guildAidPackage.findFirst({
+      where: {
+        senderGuildId: demoGuildId,
+        receiverGuild: { tag: "MOSS" },
+        status: GuildAidPackageStatus.PENDING,
+        note: "Держим ваш ранний supply run тёплым перед следующим выходом.",
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+
+    if (!outgoingAid) {
+      throw new Error("Отправленный courier package не найден.");
+    }
+
+    const aidProfile = unwrapFoundationResult(await getGuildPublicProfilePageData("MOSS"));
+    expect(aidProfile.viewerDiplomacy?.isFriendlyAidEligible).toBe(true);
+    expect(aidProfile.courier.eligibility?.isFriendlyRouteOpen ?? false).toBe(true);
+    expect(aidProfile.courier.eligibility?.pendingOutgoingToTarget ?? 0).toBeGreaterThan(0);
+
+    await setDemoContext("MOSS");
+    const mossDashboardWithIncomingAid = unwrapFoundationResult(await getDashboardPageData());
+    expect(mossDashboardWithIncomingAid.courier.incomingPendingCount).toBeGreaterThan(0);
+    expect(mossDashboardWithIncomingAid.inbox.pending.some((entry) => entry.kind === "guild-aid")).toBe(true);
+
+    const aidClaimResult = await claimIncomingGuildAidForCurrentContext(outgoingAid.id);
+    expect(aidClaimResult.status).toBe("claimed");
+
+    const claimedAid = await prisma.guildAidPackage.findUnique({
+      where: { id: outgoingAid.id },
+      select: { status: true, claimedAt: true },
+    });
+    expect(claimedAid?.status).toBe(GuildAidPackageStatus.CLAIMED);
+    expect(claimedAid?.claimedAt).not.toBeNull();
+
+    const mossProfileWithAidHistory = unwrapFoundationResult(await getGuildPublicProfilePageData("MOSS"));
+    expect(mossProfileWithAidHistory.courier.recentHistory.some((entry) => entry.id === outgoingAid.id)).toBe(true);
+
+    await setDemoContext("DEMO");
+    const secondAidSend = await sendGuildAidForCurrentContext({
+      guildTag: "CNDR",
+      resourceType: ResourceType.IRON_ORE,
+      quantity: 2,
+      note: "Небольшой ore pouch для вашего следующего forge push.",
+    });
+    expect(secondAidSend.status).toBe("pending");
+
+    const cancelCandidateAid = await prisma.guildAidPackage.findFirst({
+      where: {
+        senderGuildId: demoGuildId,
+        receiverGuild: { tag: "CNDR" },
+        status: GuildAidPackageStatus.PENDING,
+        note: "Небольшой ore pouch для вашего следующего forge push.",
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+
+    if (!cancelCandidateAid) {
+      throw new Error("Outgoing courier package для отмены не найден.");
+    }
+
+    const cancelAidResult = await cancelOutgoingGuildAidForCurrentContext(cancelCandidateAid.id);
+    expect(cancelAidResult.status).toBe("cancelled");
+
+    const cancelledAid = await prisma.guildAidPackage.findUnique({
+      where: { id: cancelCandidateAid.id },
+      select: { status: true, cancelledAt: true },
+    });
+    expect(cancelledAid?.status).toBe(GuildAidPackageStatus.CANCELLED);
+    expect(cancelledAid?.cancelledAt).not.toBeNull();
+
+    const dashboardWithCourierHistory = unwrapFoundationResult(await getDashboardPageData());
+    expect(dashboardWithCourierHistory.courier.recentHistory.some((entry) => entry.id === cancelCandidateAid.id)).toBe(true);
+    expect(dashboardWithCourierHistory.courier.recentHistory.some((entry) => entry.status === "claimed")).toBe(true);
+
     const identitySaveResult = await saveGuildIdentityForCurrentContext({
       publicTitleKey: "frontier-watch",
       crestKey: "ember",
@@ -405,6 +496,7 @@ describe("gameplay/economy integration", () => {
     expect(profilePage.favoriteTraders.length).toBeGreaterThan(0);
     expect(profilePage.socialMemory.length).toBeGreaterThan(0);
     expect(profilePage.recentActivity.length).toBeGreaterThan(0);
+    expect(profilePage.courier.recentHistory.length).toBeGreaterThan(0);
     expect(profilePage.worldEventBoard.events.some((event) => event.focusGuild?.guildTag === "DEMO")).toBe(true);
     expect(profilePage.guild.identity.motto).toBe("Пепел помнит каждый договор.");
     expect(profilePage.guild.identity.colorKey).toBe("ember");

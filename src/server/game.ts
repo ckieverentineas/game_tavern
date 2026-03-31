@@ -54,6 +54,9 @@ import {
   getActiveGuildIdentity,
 } from "@/server/foundation";
 import {
+  type GuildCourierSnapshot,
+} from "@/server/guild-aid";
+import {
   loadDashboardSocialSnapshot,
   loadGuildDirectoryPageData,
   loadGuildPrestigeSummaries,
@@ -524,7 +527,7 @@ type PresentationTone = "neutral" | "accent" | "success" | "warning";
 
 type DashboardInboxEntry = {
   id: string;
-  kind: "expedition-claim" | "market-claim" | "trade-offer" | "world-event-reward";
+  kind: "expedition-claim" | "market-claim" | "trade-offer" | "world-event-reward" | "guild-aid";
   title: string;
   summary: string;
   detail: string;
@@ -536,7 +539,7 @@ type DashboardInboxEntry = {
 
 type DashboardRecentActivityEntry = {
   id: string;
-  source: "market" | "trade" | "world-event";
+  source: "market" | "trade" | "world-event" | "courier";
   title: string;
   summary: string;
   detail: string;
@@ -931,6 +934,7 @@ export type DashboardPageData = {
   onboarding: OnboardingSnapshot;
   guildPrestige: GuildPrestigeSummary | null;
   guildIdentityEditor: GuildIdentityEditorSnapshot;
+  courier: GuildCourierSnapshot;
   watchlist: GuildWatchlistSnapshot;
   followedGuilds: WatchlistGuildCard[];
   suggestedGuilds: WatchlistGuildCard[];
@@ -5446,6 +5450,19 @@ export async function getDashboardPageData(): Promise<FoundationResult<Dashboard
         createdAt: claim.createdAt,
         tone: claim.claimTypeLabel === "Золото" ? "success" : "accent",
       })),
+      ...socialDashboard.courier.incoming
+        .filter((entry) => entry.canClaim)
+        .map<DashboardInboxEntry>((entry) => ({
+          id: `guild-aid-${entry.id}`,
+          kind: "guild-aid",
+          title: `Пакет помощи от ${entry.counterpartyGuildName} [${entry.counterpartyGuildTag}]`,
+          summary: entry.payloadLabel,
+          detail: entry.note ?? entry.statusLabel,
+          actionLabel: "Открыть courier box",
+          href: "/dashboard",
+          createdAt: entry.createdAt,
+          tone: entry.tone,
+        })),
       ...pendingTradeInbox.map<DashboardInboxEntry>((offer) => ({
         id: `trade-${offer.id}`,
         kind: "trade-offer",
@@ -5503,6 +5520,16 @@ export async function getDashboardPageData(): Promise<FoundationResult<Dashboard
           createdAt: offer.finalAt,
           tone: offer.tone,
         })),
+      ...socialDashboard.courier.recentHistory.map<DashboardRecentActivityEntry>((entry) => ({
+        id: `courier-history-${entry.id}`,
+        source: "courier",
+        title: `${entry.directionLabel}: ${entry.counterpartyGuildTag}`,
+        summary: entry.payloadLabel,
+        detail: entry.note ?? entry.statusLabel,
+        href: entry.counterpartyProfileHref,
+        createdAt: entry.eventAt,
+        tone: entry.tone,
+      })),
     ]
       .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
       .slice(0, 6);
@@ -5634,6 +5661,7 @@ export async function getDashboardPageData(): Promise<FoundationResult<Dashboard
       onboarding,
       guildPrestige,
       guildIdentityEditor,
+      courier: socialDashboard.courier,
       watchlist: socialDashboard.watchlist,
       followedGuilds: socialDashboard.followedGuilds,
       suggestedGuilds: socialDashboard.suggestedGuilds,

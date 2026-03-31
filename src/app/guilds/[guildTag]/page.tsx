@@ -6,7 +6,7 @@ import { GuildDiplomacyControls } from "@/components/guild-diplomacy-controls";
 import { GuildWatchToggle } from "@/components/guild-watch-toggle";
 import { EmptyState, InfoCard, Notice, PageHeader, Pill, SectionCard } from "@/components/ui";
 import { type PageSearchParams, formatDateTime, formatNumber, readActionFeedback } from "@/lib/format";
-import { claimWorldEventReward } from "@/server/actions/foundation";
+import { claimWorldEventReward, sendGuildAid } from "@/server/actions/foundation";
 import { getGuildPublicProfilePageData } from "@/server/game";
 
 export default async function GuildPublicProfilePage({
@@ -147,6 +147,10 @@ export default async function GuildPublicProfilePage({
           <strong>{data.viewerDiplomacy.relationLabel}.</strong> {data.viewerDiplomacy.summary}
         </Notice>
       ) : null}
+
+      <Notice tone={data.courier.tone}>
+        <strong>{data.courier.statusLabel}.</strong> {data.courier.summary} {data.courier.spotlight}
+      </Notice>
 
       <Notice tone="accent">
         <strong>{data.worldEventBoard.season.label}.</strong> Профиль теперь показывает не только prestige-историю,
@@ -305,6 +309,141 @@ export default async function GuildPublicProfilePage({
                 </div>
               </article>
             ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Friendly courier route"
+          description="Courier packages добавляют мягкий social-first loop помощи между дружественными домами: только ограниченные ресурсы, явный sender/receiver, записка и claim-history без превращения профиля в free-trade backend."
+          aside={<Pill tone={data.courier.tone}>{data.courier.statusLabel}</Pill>}
+        >
+          <div className="stack-sm">
+            <article className="row-card">
+              <div>
+                <div className="row-card__title">Courier memory</div>
+                <p className="row-card__description">
+                  {data.courier.summary}
+                  <br />
+                  {data.courier.spotlight}
+                  <br />
+                  {data.viewerDiplomacy
+                    ? `${data.viewerDiplomacy.friendlyAidStatusLabel} · ${data.viewerDiplomacy.friendlyAidSummary}`
+                    : "Для собственной гильдии courier loop читается как часть публичной social памяти дома."}
+                </p>
+              </div>
+              <div className="row-card__aside">
+                <Pill tone={data.courier.incomingPendingCount > 0 ? "success" : data.courier.outgoingPendingCount > 0 ? "accent" : "neutral"}>
+                  {`${data.courier.incomingPendingCount} incoming`}
+                </Pill>
+                <Pill tone={data.courier.outgoingPendingCount > 0 ? "accent" : "neutral"}>
+                  {`${data.courier.outgoingPendingCount} outgoing`}
+                </Pill>
+              </div>
+            </article>
+
+            {!data.guild.isCurrentContext && data.courier.eligibility ? (
+              <article className="row-card">
+                <div>
+                  <div className="row-card__title">Send a friendly aid package</div>
+                  <p className="row-card__description">
+                    {data.courier.eligibility.summary}
+                    <br />
+                    Pending route: {data.courier.eligibility.pendingOutgoingToTarget}/{data.courier.eligibility.pendingLimit} · courier fee {data.courier.eligibility.courierFeeGold} зол. · max {data.courier.eligibility.maxQuantityPerPackage} ед.
+                  </p>
+                </div>
+                <div className="row-card__aside">
+                  <Pill tone={data.courier.eligibility.canSend ? "success" : data.courier.eligibility.isFriendlyRouteOpen ? "accent" : "neutral"}>
+                    {data.courier.eligibility.statusLabel}
+                  </Pill>
+                </div>
+              </article>
+            ) : null}
+
+            {!data.guild.isCurrentContext && data.courier.eligibility?.resourceOptions.length ? (
+              <form action={sendGuildAid} className="card-form">
+                <input type="hidden" name="guildTag" value={data.guild.tag} />
+                <input type="hidden" name="redirectTo" value={`/guilds/${encodeURIComponent(data.guild.tag)}`} />
+
+                <div className="form-grid form-grid--3">
+                  <label className="form-field">
+                    <span className="form-field__label">Payload resource</span>
+                    <select name="resourceType" defaultValue={data.courier.eligibility.resourceOptions[0]?.resourceType ?? ""}>
+                      {data.courier.eligibility.resourceOptions.map((resource) => (
+                        <option key={resource.resourceType} value={resource.resourceType}>
+                          {resource.label} · доступно {resource.availableAmount} · до {resource.maxSendable}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="form-field">
+                    <span className="form-field__label">Quantity</span>
+                    <input
+                      name="quantity"
+                      type="number"
+                      min={1}
+                      max={data.courier.eligibility.maxQuantityPerPackage}
+                      defaultValue={Math.min(4, data.courier.eligibility.maxQuantityPerPackage)}
+                    />
+                  </label>
+
+                  <label className="form-field">
+                    <span className="form-field__label">Courier fee</span>
+                    <input type="text" value={`${data.courier.eligibility.courierFeeGold} зол.`} readOnly />
+                  </label>
+                </div>
+
+                <label className="form-field">
+                  <span className="form-field__label">Note</span>
+                  <textarea
+                    name="note"
+                    maxLength={data.courier.eligibility.noteMaxLength}
+                    placeholder="Например: держим ваш supply run тёплым перед следующим выходом."
+                  />
+                  <span className="form-help">
+                    Friendly aid остаётся мягкой: только ресурсы, маленький cap и видимая записка для social memory.
+                  </span>
+                </label>
+
+                <button className="button button--primary" type="submit" disabled={!data.courier.eligibility.canSend}>
+                  Отправить courier package
+                </button>
+              </form>
+            ) : null}
+
+            {[...data.courier.incoming, ...data.courier.outgoing].length > 0 ? (
+              <div className="stack-sm">
+                <div className="row-card__title">Visible courier packages</div>
+                {[...data.courier.incoming, ...data.courier.outgoing].map((entry) => (
+                  <article key={entry.id} className="row-card">
+                    <div>
+                      <div className="row-card__title">
+                        {entry.directionLabel} · {entry.counterpartyGuildName} [{entry.counterpartyGuildTag}]
+                      </div>
+                      <p className="row-card__description">
+                        {entry.payloadLabel}
+                        <br />
+                        {entry.note ?? "Записка скрыта или отсутствует; маршрут остаётся публично мягким и не превращается в полноценный trade ticket."}
+                        <br />
+                        {entry.statusLabel}
+                      </p>
+                    </div>
+                    <div className="row-card__aside">
+                      <Pill tone={entry.tone}>{entry.statusLabel}</Pill>
+                      <span className="muted">{formatDateTime(entry.eventAt)}</span>
+                      <Link className="button button--ghost" href={entry.counterpartyProfileHref}>
+                        Профиль дома
+                      </Link>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="Courier route ещё не прогрет"
+                description="Как только дружественные дома начнут отправлять небольшие aid packages, здесь появятся отправитель, payload, записка и history claim-ов."
+              />
+            )}
           </div>
         </SectionCard>
 

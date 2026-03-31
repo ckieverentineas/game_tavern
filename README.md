@@ -34,6 +34,7 @@ npm run dev
   - экипировать предметы на героев и снять их обратно
   - выставить item/resource лот на рынок, купить чужой лот, отменить свой и забрать claim
   - создать приватную barter-сделку, принять её, отклонить или отменить
+  - отправить дружественной гильдии courier package с ресурсами, затем переключиться в другую перспективу и забрать помощь claim-ом
   - купить guild upgrade на дополнительные слоты и progression unlock-и
   - открыть `/guilds`, сравнить public leaderboards, перейти в публичный профиль гильдии и затем мягко провалиться в `/market?guild=TAG` или `/deals?to=TAG`
 
@@ -51,12 +52,13 @@ npm run dev
   - гильдию, tag, owner/display name
   - progression snapshot, power, wealth, PvE status и часть ростера
   - favorite traders, recurring interaction summary, renown perks/badges и recent social memory
+  - courier / guild-aid layer с friendly eligibility, incoming/outgoing package history и мягким CTA на помощь дружественному дому
   - live market / buy-order витрину и recent public activity
   - seasonal status по событиям frontier / market / forge
   - social CTA в `/market?guild=TAG` и `/deals?to=TAG`
-- Dashboard теперь получает персональный follow feed: после добавления домов в watchlist в ленту собираются их market sales, buy-order fulfills, accepted deals, contract claims, workshop / guild upgrade spikes и high-risk clears.
+- Dashboard теперь получает персональный follow feed, courier board и unified inbox: после добавления домов в watchlist в ленту собираются их market sales, buy-order fulfills, accepted deals, contract claims, workshop / guild upgrade spikes, high-risk clears и friendly aid memory, а собственные courier packages видны как incoming/outgoing claim-flow.
 - В account-режиме watchlist хранится за пользователем, а в demo sandbox живёт отдельно в cookie; если demo-watchlist ещё не настроен, seed social memory автоматически подсказывает несколько знакомых домов, чтобы feed не был пустым сразу после [`npm run db:setup`](package.json:19).
-- Dashboard, `/market` и `/deals` теперь отдельно подсвечивают favorite traders, recurring ties и preferred-trader callout-ы как мягкий retention hook.
+- Dashboard, `/market` и `/deals` теперь отдельно подсвечивают favorite traders, recurring ties, courier help history и preferred-trader callout-ы как мягкий retention hook.
 
 ## Проверки
 

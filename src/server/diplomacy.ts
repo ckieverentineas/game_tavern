@@ -80,6 +80,9 @@ export type GuildDiplomacyPairSnapshot = {
   isTargetingCurrentGuild: boolean;
   suggestedActionLabel: string;
   rivalryPressureLabel: string | null;
+  isFriendlyAidEligible: boolean;
+  friendlyAidStatusLabel: string;
+  friendlyAidSummary: string;
 };
 
 export type GuildDiplomacyState = {
@@ -842,6 +845,11 @@ export function buildViewerGuildDiplomacy(input: {
       isTargetingCurrentGuild: incoming?.relation === "rivalry",
       suggestedActionLabel: "Можно убрать endorsement и вернуть neutral stance.",
       rivalryPressureLabel: incoming?.relation === "rivalry" ? incoming.reasonLabel : null,
+      isFriendlyAidEligible: true,
+      friendlyAidStatusLabel: hasMutualEndorsement ? "Mutual courier route" : "Friendly courier open",
+      friendlyAidSummary: hasMutualEndorsement
+        ? "Взаимный endorsement уже открыл тёплый courier loop помощи между домами."
+        : "Ваш endorsement даёт этой связи friendly статус, достаточный для courier package.",
     };
   }
 
@@ -864,6 +872,9 @@ export function buildViewerGuildDiplomacy(input: {
       isTargetingCurrentGuild: incoming?.relation === "rivalry",
       suggestedActionLabel: "Можно снять rival tag и вернуть neutral stance.",
       rivalryPressureLabel: outgoing?.reasonLabel ?? incoming?.reasonLabel ?? null,
+      isFriendlyAidEligible: false,
+      friendlyAidStatusLabel: "Courier blocked",
+      friendlyAidSummary: "Rivalry-lite связь блокирует friendly aid, пока дом не вернётся к neutral или endorsement relation.",
     };
   }
 
@@ -884,6 +895,9 @@ export function buildViewerGuildDiplomacy(input: {
       isTargetingCurrentGuild: false,
       suggestedActionLabel: "Можно ответить взаимным endorsement-ом.",
       rivalryPressureLabel: suggestedRival?.reasonLabel ?? null,
+      isFriendlyAidEligible: true,
+      friendlyAidStatusLabel: "Friendly courier open",
+      friendlyAidSummary: "Их endorsement уже помечает связь как дружелюбную и открывает мягкий courier route помощи.",
     };
   }
 
@@ -904,6 +918,9 @@ export function buildViewerGuildDiplomacy(input: {
       isTargetingCurrentGuild: true,
       suggestedActionLabel: suggestedAlly ? "Можно проигнорировать rival tag или ответить endorsement-ом." : "Можно ответить rival tag-ом или оставить tension односторонним.",
       rivalryPressureLabel: incoming.reasonLabel,
+      isFriendlyAidEligible: false,
+      friendlyAidStatusLabel: "Courier blocked",
+      friendlyAidSummary: "Односторонний rival tag не даёт открыть friendly aid, даже если social memory уже появилась.",
     };
   }
 
@@ -924,6 +941,9 @@ export function buildViewerGuildDiplomacy(input: {
       isTargetingCurrentGuild: false,
       suggestedActionLabel: "Стоит дать endorsement как знакомому дому.",
       rivalryPressureLabel: suggestedRival?.reasonLabel ?? null,
+      isFriendlyAidEligible: false,
+      friendlyAidStatusLabel: "Need endorsement",
+      friendlyAidSummary: "Social memory уже тёплая, но courier packages открываются только после хотя бы одного endorsement.",
     };
   }
 
@@ -944,6 +964,9 @@ export function buildViewerGuildDiplomacy(input: {
       isTargetingCurrentGuild: false,
       suggestedActionLabel: "Можно отметить дом мягким rival tag-ом.",
       rivalryPressureLabel: suggestedRival.reasonLabel,
+      isFriendlyAidEligible: false,
+      friendlyAidStatusLabel: "Courier unavailable",
+      friendlyAidSummary: "Suggested rival статус держит связь соревновательной, а не дружеской: courier aid здесь не открывается.",
     };
   }
 
@@ -965,5 +988,8 @@ export function buildViewerGuildDiplomacy(input: {
     isTargetingCurrentGuild: false,
     suggestedActionLabel: "Можно оставить neutral или задать первый endorsement / rival tag.",
     rivalryPressureLabel: null,
+    isFriendlyAidEligible: false,
+    friendlyAidStatusLabel: "Neutral contact",
+    friendlyAidSummary: "Friendly courier aid появится после первого endorsement и не работает на чисто neutral связи.",
   };
 }
