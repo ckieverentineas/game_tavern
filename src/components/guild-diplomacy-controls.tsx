@@ -21,10 +21,10 @@ export function GuildDiplomacyControls({
   relation,
   redirectTo,
   disabled = false,
-  endorseLabel = "Endorse",
-  rivalLabel = "Tag rival",
+  endorseLabel = "Поддержать дом",
+  rivalLabel = "Пометить rival",
   unrivalLabel = "Снять rival",
-  clearLabel = "Neutral",
+  clearLabel = "Сбросить связь",
 }: GuildDiplomacyControlsProps) {
   return (
     <div className="actions-inline">

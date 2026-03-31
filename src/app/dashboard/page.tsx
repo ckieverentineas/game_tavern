@@ -3,9 +3,10 @@ import { connection } from "next/server";
 
 import { GuildIdentityMark, getGuildIdentitySurfaceStyle } from "@/components/guild-identity";
 import { GuildDiplomacyControls } from "@/components/guild-diplomacy-controls";
+import { TutorialLayer } from "@/components/tutorial-layer";
 import { GuildWatchToggle } from "@/components/guild-watch-toggle";
 import { EmptyState, InfoCard, Notice, PageHeader, Pill, SectionCard } from "@/components/ui";
-import { FOUNDATION_ACTIONS } from "@/lib/domain";
+import { FOUNDATION_ACTIONS, QUICK_TUTORIAL_STEPS } from "@/lib/domain";
 import {
   type PageSearchParams,
   formatCompactList,
@@ -111,58 +112,83 @@ export default async function DashboardPage({
             </Link>
           </>
         }
+        badges={
+          <>
+            <Pill tone={data.onboarding.isActive ? "accent" : "success"}>{data.onboarding.progressLabel}</Pill>
+            {data.guildPrestige ? <Pill tone={data.guildPrestige.prestige.tone}>{data.guildPrestige.prestige.tierLabel}</Pill> : null}
+            <Pill tone={shellContext.mode === "demo" ? "accent" : "success"}>
+              {shellContext.mode === "demo" ? "Demo context" : "Account context"}
+            </Pill>
+          </>
+        }
+        meta={
+          <>
+            <span>Lv. {data.guild.level}</span>
+            <span>• {formatNumber(data.guild.gold)} золота</span>
+            <span>• {data.inbox.pending.length} actionable inbox</span>
+            <span>• {data.activeExpeditions.length} активных экспедиций</span>
+          </>
+        }
       />
 
-      {feedback ? <Notice tone={feedback.tone}>{feedback.message}</Notice> : null}
+      {feedback ? <Notice title="Результат действия" tone={feedback.tone}>{feedback.message}</Notice> : null}
 
-      <Notice tone="accent">
+      <Notice title="Guild context" tone="accent">
         Текущий guild context: {data.guild.name} [{data.guild.tag}]. В account-режиме это ваша
         личная гильдия, а в demo sandbox shell может переключать seeded-перспективу без смешивания
         данных между режимами.
       </Notice>
 
-      <Notice tone="success">
+      <Notice title="PvE payoff" tone="success">
         PvE теперь даёт не только новые зоны, но и разные типы ставок: resource-heavy supply run, жадный high-risk payout и elite run под rare loot + XP.
       </Notice>
 
-      <Notice tone="success">
+      <Notice title="Social visibility" tone="success">
         Социальный слой уже включён: эту гильдию можно открыть как public profile, сравнить с другими в `/guilds` и теперь быстро настроить её identity без тяжёлого theme-builder-а.
       </Notice>
 
       {data.guildPrestige ? (
-        <Notice tone={data.guildPrestige.prestige.tone}>
+        <Notice title="Prestige" tone={data.guildPrestige.prestige.tone}>
           <strong>{data.guildPrestige.prestige.tierLabel}.</strong> {data.guildPrestige.prestige.spotlight}
         </Notice>
       ) : null}
 
       {data.guildPrestige ? (
-        <Notice tone={data.guildPrestige.renown.tone}>
+        <Notice title="Renown" tone={data.guildPrestige.renown.tone}>
           <strong>{data.guildPrestige.renown.tierLabel}.</strong> {data.guildPrestige.renown.spotlight}
           {data.guildPrestige.renown.favoriteCounterpartyLabel ? ` Любимый дом сейчас: ${data.guildPrestige.renown.favoriteCounterpartyLabel}.` : ""}
         </Notice>
       ) : null}
 
       {data.guildPrestige ? (
-        <Notice tone={data.guildPrestige.diplomacy.tone}>
+        <Notice title="Diplomacy" tone={data.guildPrestige.diplomacy.tone}>
           <strong>{data.guildPrestige.diplomacy.statusLabel}.</strong> {data.guildPrestige.diplomacy.spotlight}
         </Notice>
       ) : null}
 
-      <Notice tone={data.courier.tone}>
+      <Notice title="Courier layer" tone={data.courier.tone}>
         <strong>{data.courier.statusLabel}.</strong> {data.courier.summary} {data.courier.spotlight}
       </Notice>
 
-      <Notice tone="accent">
+      <Notice
+        title="Seasonal board"
+        tone="accent"
+        action={
+          <Link className="button button--ghost" href="/guilds">
+            Открыть весь board
+          </Link>
+        }
+      >
         <strong>{worldEventBoard.season.label}.</strong> {worldEventBoard.season.summary} Сейчас видно
         {` ${worldEventBoard.summary.claimableRewardCount} готовых reward-claim, ${worldEventBoard.summary.nearGoalCount} близких tier-целей и ${worldEventBoard.summary.recentActivityCount} публичных сигналов активности.`}
       </Notice>
 
-      <Notice tone={data.watchlist.count > 0 ? (data.watchlist.isAutoSeeded ? "success" : "accent") : "neutral"}>
+      <Notice title="Watchlist" tone={data.watchlist.count > 0 ? (data.watchlist.isAutoSeeded ? "success" : "accent") : "neutral"}>
         <strong>{data.watchlist.storageLabel}.</strong> {data.watchlist.summary} {data.watchlist.helperText}
       </Notice>
 
       {shellContext.mode === "demo" ? (
-        <Notice tone="accent">
+        <Notice title="Demo sandbox" tone="accent">
           Сейчас открыт demo sandbox: onboarding board читает состояние активной seeded-гильдии и может быть уже частично пройден, но не мешает multi-guild switching и локальной диагностике.
         </Notice>
       ) : null}
@@ -292,6 +318,12 @@ export default async function DashboardPage({
               : worldEventBoard.season.label}
           </Pill>
         }
+        actions={
+          <Link className="button button--ghost" href="/guilds">
+            Открыть global standings
+          </Link>
+        }
+        tone="accent"
       >
         <div className="stack-sm">
           {worldEventBoard.events.map((event) => {
@@ -348,6 +380,12 @@ export default async function DashboardPage({
         title="First-session guide"
         description={data.onboarding.summary}
         aside={<Pill tone={data.onboarding.isActive ? "accent" : "success"}>{data.onboarding.progressLabel}</Pill>}
+        actions={
+          <Link className="button button--ghost" href={recommendedAction?.href ?? "/guilds"}>
+            {recommendedAction?.actionLabel ?? "Открыть community board"}
+          </Link>
+        }
+        tone={data.onboarding.isActive ? "accent" : "success"}
       >
         <div className="stack-sm">
           {recommendedAction ? (
@@ -397,6 +435,15 @@ export default async function DashboardPage({
           })}
         </div>
       </SectionCard>
+
+      {data.onboarding.isActive ? (
+        <TutorialLayer
+          storageKey="guild-exchange-quick-tutorial-v1"
+          title="Короткий маршрут по активному сеансу"
+          description="Этот overlay остаётся поверх dashboard, чтобы новичок быстро прошёл базовые циклы, а опытный игрок мог свернуть или скрыть его одним кликом."
+          steps={QUICK_TUTORIAL_STEPS}
+        />
+      ) : null}
 
       <div className="stats-grid stats-grid--4">
         {data.guildPrestige ? (
@@ -478,6 +525,7 @@ export default async function DashboardPage({
               : `${contractBoard.summary.inProgressCount} в работе`}
           </Pill>
         }
+        tone={contractBoard.summary.readyCount > 0 ? "success" : "accent"}
       >
         <div className="stack-sm">
           {contractBoard.entries.map((contract) => (
@@ -528,6 +576,7 @@ export default async function DashboardPage({
       <SectionCard
         title="Recent completed contracts"
         description="Последние закрытые objective-контракты остаются видимыми как короткая history-лента, чтобы multi-guild demo было проще читать при переключении перспективы."
+        tone="neutral"
       >
         {contractBoard.recentCompleted.length > 0 ? (
           <div className="stack-sm">
@@ -554,7 +603,12 @@ export default async function DashboardPage({
         ) : (
           <EmptyState
             title="Контракты ещё не завершались"
-            description="После первого contract claim здесь появится короткая recent-лента закрытых objective-циклов." 
+            description="После первого contract claim здесь появится короткая recent-лента закрытых objective-циклов."
+            action={
+              <Link className="button button--ghost" href={recommendedAction?.href ?? "/market"}>
+                {recommendedAction?.actionLabel ?? "Открыть следующий loop"}
+              </Link>
+            }
           />
         )}
       </SectionCard>
@@ -714,6 +768,12 @@ export default async function DashboardPage({
         title="Guild watchlist"
         description={data.watchlist.summary}
         aside={<Pill tone={data.watchlist.count > 0 ? "accent" : "neutral"}>{`${data.watchlist.count}/${data.watchlist.maxCount}`}</Pill>}
+        actions={
+          <Link className="button button--ghost" href="/guilds">
+            Найти новые дома
+          </Link>
+        }
+        tone="accent"
       >
         <div className="stack-sm">
           {data.followedGuilds.length > 0 ? (
@@ -762,6 +822,11 @@ export default async function DashboardPage({
             <EmptyState
               title="Watchlist ещё не собран"
               description="Добавьте несколько интересных домов, чтобы dashboard начал собирать для вас персональную social activity ленту."
+              action={
+                <Link className="button button--ghost" href="/guilds">
+                  Открыть каталог гильдий
+                </Link>
+              }
             />
           )}
 

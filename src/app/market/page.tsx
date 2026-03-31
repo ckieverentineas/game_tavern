@@ -69,6 +69,20 @@ export default async function MarketPage({
         eyebrow="Marketplace"
         title={`${data.guildName} [${data.guildTag}] · market + request board`}
         description="Экран читается из перспективы активной гильдии: свои fixed-price лоты, resource buy orders, claim box и обе history-ленты переключаются вместе с guild context."
+        badges={
+          <>
+            <Pill tone={data.marketUnlocked ? "success" : "warning"}>{data.marketUnlocked ? "Market open" : "Market locked"}</Pill>
+            <Pill tone={data.claimBox.length > 0 ? "success" : "accent"}>{`${data.claimBox.length} claim`}</Pill>
+            {data.highlightedGuildContext ? <Pill tone="accent">Spotlight {data.highlightedGuildContext.tag}</Pill> : null}
+          </>
+        }
+        meta={
+          <>
+            <span>{data.activeListings.length} активных лотов</span>
+            <span>• {data.activeBuyOrders.length} buy orders</span>
+            <span>• {data.fulfillableBuyOrders.length} можно закрыть прямо сейчас</span>
+          </>
+        }
         actions={
           <>
             <Link className="button button--primary" href="/inventory">
@@ -86,28 +100,28 @@ export default async function MarketPage({
         }
       />
 
-      {feedback ? <Notice tone={feedback.tone}>{feedback.message}</Notice> : null}
+      {feedback ? <Notice title="Результат действия" tone={feedback.tone}>{feedback.message}</Notice> : null}
 
-      <Notice tone="accent">
+      <Notice title="Текущая перспектива" tone="accent">
         Активная перспектива: {data.guildName} [{data.guildTag}]. Метка «Ваш лот» и весь claim box
         относятся только к этой гильдии. В account-режиме это ваши реальные данные, а в demo sandbox
         shell позволяет быстро переключать встречную сторону тех же sell / request scenarios.
       </Notice>
 
       {data.guildPrestige ? (
-        <Notice tone={data.guildPrestige.prestige.tone}>
+        <Notice title="Prestige" tone={data.guildPrestige.prestige.tone}>
           <strong>{data.guildPrestige.prestige.tierLabel}.</strong> {data.guildPrestige.prestige.spotlight}
         </Notice>
       ) : null}
 
       {data.guildPrestige ? (
-        <Notice tone={data.guildPrestige.renown.tone}>
+        <Notice title="Renown" tone={data.guildPrestige.renown.tone}>
           <strong>{data.guildPrestige.renown.tierLabel}.</strong> {data.guildPrestige.renown.spotlight}
         </Notice>
       ) : null}
 
       {data.highlightedGuildContext ? (
-        <Notice tone="success">
+        <Notice title="Guild in focus" tone="success">
           Публичный контекст {data.highlightedGuildContext.name} [{data.highlightedGuildContext.tag}] уже
           подмешан в рынок: в фокусе {highlightedListingsCount} лотов и {highlightedBuyOrdersCount} buy
           orders этой гильдии. Это мягкий social bridge от public profile к реальному взаимодействию.
@@ -121,17 +135,17 @@ export default async function MarketPage({
       ) : null}
 
       {recommendedAction?.href === "/market" ? (
-        <Notice tone={recommendedAction.tone}>
+        <Notice title="Market objective" tone={recommendedAction.tone}>
           <strong>{recommendedAction.title}.</strong> {recommendedAction.summary} {recommendedAction.reason}
         </Notice>
       ) : listingMilestone && listingMilestone.status !== "completed" ? (
-        <Notice tone={listingMilestone.tone}>
+        <Notice title="Первый лот" tone={listingMilestone.tone}>
           <strong>{listingMilestone.title}.</strong> {listingMilestone.summary} {listingMilestone.blockers[0] ?? "Рынок уже готов к первому лоту."}
         </Notice>
       ) : null}
 
       {marketSeasonEvents[0] ? (
-        <Notice tone={marketSeasonEvents[0].tone}>
+        <Notice title="Seasonal pressure" tone={marketSeasonEvents[0].tone}>
           <strong>{marketSeasonEvents[0].title}.</strong> Каждая продажа на витрине и закрытый чужой buy order
           теперь двигают seasonal convoy board, а не только локальный кошелёк.
         </Notice>
@@ -141,6 +155,12 @@ export default async function MarketPage({
         title="Market seasonal board"
         description={`Публичный рынок теперь работает как массовый social loop для ${data.worldEventBoard.season.label}: видно общий прогресс, вклад вашей гильдии и standings соперников.`}
         aside={<Pill tone={marketSeasonEvents.some((event) => event.rewardTiers.some((tier) => tier.status === "claimable")) ? "success" : "accent"}>{`${marketSeasonEvents.length} event`}</Pill>}
+        actions={
+          <Link className="button button--ghost" href="/guilds">
+            Смотреть полный board
+          </Link>
+        }
+        tone="accent"
       >
         <div className="stack-sm">
           {marketSeasonEvents.map((event) => {
@@ -193,6 +213,7 @@ export default async function MarketPage({
         title="Market-linked contracts"
         description="Эти контракты читают рынок как часть objective board: продажа, supply delivery и request fulfillment двигаются теми же действиями, что уже живут на этой странице."
         aside={<Pill tone={marketContracts.some((contract) => contract.claimable) ? "success" : "accent"}>{`${marketContracts.length} linked`}</Pill>}
+        tone={marketContracts.some((contract) => contract.claimable) ? "success" : "accent"}
       >
         <div className="stack-sm">
           {marketContracts.map((contract) => (
@@ -249,6 +270,7 @@ export default async function MarketPage({
           title="Favorite traders on this market"
           description="Мягкий retention hook: знакомые дома уже собраны из повторных market/deal/request interactions и подсвечиваются прямо перед торговлей."
           aside={<Pill tone={data.guildPrestige.renown.tone}>{data.guildPrestige.renown.tierLabel}</Pill>}
+          tone="success"
         >
           <div className="stack-sm">
             {data.guildPrestige.favoriteCounterparties.map((counterparty) => (
@@ -279,7 +301,7 @@ export default async function MarketPage({
       ) : null}
 
       <div className="content-grid content-grid--two-thirds">
-        <SectionCard title="Выставить предмет" description="Лот создаётся с мгновенной оплатой listing fee и блокировкой экземпляра предмета.">
+        <SectionCard title="Выставить предмет" description="Лот создаётся с мгновенной оплатой listing fee и блокировкой экземпляра предмета." tone="accent">
           <form action={createMarketListing} className="card-form">
             <input type="hidden" name="listingType" value="ITEM" />
             <input type="hidden" name="redirectTo" value="/market" />
@@ -305,7 +327,7 @@ export default async function MarketPage({
           </form>
         </SectionCard>
 
-        <SectionCard title="Выставить ресурс" description="Стек продаётся целиком и не поддерживает частичный выкуп в MVP.">
+        <SectionCard title="Выставить ресурс" description="Стек продаётся целиком и не поддерживает частичный выкуп в MVP." tone="accent">
           <form action={createMarketListing} className="card-form">
             <input type="hidden" name="listingType" value="RESOURCE" />
             <input type="hidden" name="redirectTo" value="/market" />
@@ -341,6 +363,7 @@ export default async function MarketPage({
         <SectionCard
           title="Разместить buy order / resource request"
           description="Этот MVP-слой поддерживает только resource-заявки: золото резервируется сразу и возвращается через claim box, если заявка отменена или истекает."
+          tone="accent"
         >
           <form action={createBuyOrder} className="card-form">
             <input type="hidden" name="redirectTo" value="/market" />
@@ -374,7 +397,7 @@ export default async function MarketPage({
           </form>
         </SectionCard>
 
-        <SectionCard title="Можно исполнить прямо сейчас" description="Сервер заранее отмечает, где у текущей гильдии уже хватает ресурса для ручного закрытия чужого спроса.">
+        <SectionCard title="Можно исполнить прямо сейчас" description="Сервер заранее отмечает, где у текущей гильдии уже хватает ресурса для ручного закрытия чужого спроса." tone="success">
           {data.fulfillableBuyOrders.length > 0 ? (
             <div className="stack-sm">
               {data.fulfillableBuyOrders.map((order) => (
@@ -414,7 +437,7 @@ export default async function MarketPage({
         </SectionCard>
       </div>
 
-      <SectionCard title="Лента активных лотов" description="Можно купить чужой лот мгновенно или отменить собственный до продажи.">
+      <SectionCard title="Лента активных лотов" description="Можно купить чужой лот мгновенно или отменить собственный до продажи." tone="accent">
         {data.activeListings.length > 0 ? (
           <div className="stack-sm">
             {data.activeListings.map((listing) => (
@@ -470,7 +493,7 @@ export default async function MarketPage({
       </SectionCard>
 
       <div className="content-grid content-grid--two-thirds">
-        <SectionCard title="Claim box" description="Продажи, возвраты лотов, buy-order payouts и gold refunds не падают напрямую в инвентарь / кошелёк — их нужно забрать отдельным действием.">
+        <SectionCard title="Claim box" description="Продажи, возвраты лотов, buy-order payouts и gold refunds не падают напрямую в инвентарь / кошелёк — их нужно забрать отдельным действием." tone="success">
           {data.claimBox.length > 0 ? (
             <div className="stack-sm">
               {data.claimBox.map((claim) => (
@@ -502,7 +525,7 @@ export default async function MarketPage({
           )}
         </SectionCard>
 
-        <SectionCard title="Мои активные лоты и правила" description="Здесь видны ваш текущий лимит лотов, налоги и базовые ограничения торговли.">
+        <SectionCard title="Мои активные лоты и правила" description="Здесь видны ваш текущий лимит лотов, налоги и базовые ограничения торговли." tone="neutral">
           {data.myListings.length > 0 ? (
             <div className="stack-sm">
               {data.myListings.map((listing) => (
@@ -549,7 +572,7 @@ export default async function MarketPage({
       </div>
 
       <div className="content-grid content-grid--two-thirds">
-        <SectionCard title="Лента request board" description="Открытый спрос других гильдий: свой заказ можно отменить, чужой — исполнить, если ресурс реально лежит на складе.">
+        <SectionCard title="Лента request board" description="Открытый спрос других гильдий: свой заказ можно отменить, чужой — исполнить, если ресурс реально лежит на складе." tone="accent">
           {data.activeBuyOrders.length > 0 ? (
             <div className="stack-sm">
               {data.activeBuyOrders.map((order) => (
@@ -600,7 +623,7 @@ export default async function MarketPage({
           )}
         </SectionCard>
 
-        <SectionCard title="Мои активные заявки" description="Здесь видно, какой ресурс вы сейчас ищете и сколько золота удерживается в резерве до закрытия заявки.">
+        <SectionCard title="Мои активные заявки" description="Здесь видно, какой ресурс вы сейчас ищете и сколько золота удерживается в резерве до закрытия заявки." tone="neutral">
           {data.myBuyOrders.length > 0 ? (
             <div className="stack-sm">
               {data.myBuyOrders.map((order) => (
@@ -632,6 +655,7 @@ export default async function MarketPage({
         <SectionCard
           title="История fixed-price market"
           description="Каждый resolved lot теперь показывает, что именно произошло: товар, цена, налог/выплата/возврат, контрагент и время события."
+          tone="neutral"
         >
           {data.marketHistory.length > 0 ? (
             <div className="stack-sm">
@@ -674,6 +698,7 @@ export default async function MarketPage({
         <SectionCard
           title="История request board"
           description="Buy orders показывают ручное закрытие спроса, возвраты резерва и истечения так же прозрачно, как обычные sell listings."
+          tone="neutral"
         >
           {data.buyOrderHistory.length > 0 ? (
             <div className="stack-sm">

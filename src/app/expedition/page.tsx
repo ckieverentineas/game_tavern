@@ -94,32 +94,61 @@ export default async function ExpeditionPage({
         eyebrow="Expeditions"
         title="PvE-горизонт: маршруты, специализации наград и элитные вылазки"
         description="Экспедиции теперь различаются не только по tier зоны: часть маршрутов играет в resource farming, часть — в жадный high-risk payout, а элитные забеги заметно сильнее давят на партию ради редкого лута и XP."
+        badges={
+          <>
+            <Pill tone={claimableRuns > 0 ? "success" : "accent"}>{`${claimableRuns} claim-ready`}</Pill>
+            <Pill tone={data.rosterProgression.reserveLoopUnlocked ? "success" : "warning"}>
+              {data.rosterProgression.reserveLoopUnlocked ? "Второй состав готов" : "Нужен резерв"}
+            </Pill>
+            <Pill tone="accent">{data.zoneProgression.highestUnlockedRiskLabel}</Pill>
+          </>
+        }
+        meta={
+          <>
+            <span>{activeRuns} активных походов</span>
+            <span>• {data.availableHeroes.length} свободных героев</span>
+            <span>• {data.zoneProgression.unlockedLocationCount}/{data.zoneProgression.totalLocationCount} зон</span>
+          </>
+        }
+        actions={
+          <>
+            <Link className="button button--primary" href="/heroes">
+              Подготовить ростер
+            </Link>
+            <Link className="button button--ghost" href="/inventory">
+              Проверить ресурсы
+            </Link>
+            <Link className="button button--ghost" href="/dashboard">
+              На dashboard
+            </Link>
+          </>
+        }
       />
 
-      {feedback ? <Notice tone={feedback.tone}>{feedback.message}</Notice> : null}
+      {feedback ? <Notice title="Результат действия" tone={feedback.tone}>{feedback.message}</Notice> : null}
 
-      <Notice tone="accent">
+      <Notice title="PvE reading" tone="accent">
         Читаемый выбор теперь такой: обычные маршруты дают baseline-награду, снабженческие рейсы сильнее кормят workshop,
         высокорисковые обходы толкают в золото и волатильность, а элитные экспедиции поднимают ставку на rare loot и hero XP.
       </Notice>
 
       {expeditionSeasonEvents[0] ? (
-        <Notice tone={expeditionSeasonEvents[0].tone}>
+        <Notice title="Seasonal pressure" tone={expeditionSeasonEvents[0].tone}>
           <strong>{expeditionSeasonEvents[0].title}.</strong> Очки сезона приходят именно после claim экспедиции:
           high-risk и elite clear превращаются в публичный вклад и seasonal reward tiers.
         </Notice>
       ) : null}
 
       {recommendedAction?.href === "/expedition" ? (
-        <Notice tone={recommendedAction.tone}>
+        <Notice title="Recommended next step" tone={recommendedAction.tone}>
           <strong>{recommendedAction.title}.</strong> {recommendedAction.summary} {recommendedAction.reason}
         </Notice>
       ) : claimMilestone?.status === "available" ? (
-        <Notice tone="success">
+        <Notice title="Claim ready" tone="success">
           <strong>{claimMilestone.title}.</strong> {claimMilestone.summary}
         </Notice>
       ) : startMilestone && startMilestone.status !== "completed" ? (
-        <Notice tone={startMilestone.tone}>
+        <Notice title="First expedition" tone={startMilestone.tone}>
           <strong>{startMilestone.title}.</strong> {startMilestone.summary} {startMilestone.blockers[0] ?? "Экран уже готов к первой партии."}
         </Notice>
       ) : null}
@@ -132,6 +161,12 @@ export default async function ExpeditionPage({
             {`${expeditionSeasonEvents.length} event`}
           </Pill>
         }
+        actions={
+          <Link className="button button--ghost" href="/guilds">
+            Смотреть global standings
+          </Link>
+        }
+        tone="accent"
       >
         <div className="stack-sm">
           {expeditionSeasonEvents.map((event) => {
@@ -188,6 +223,7 @@ export default async function ExpeditionPage({
         title="PvE-linked contracts"
         description="Objective board подсказывает, какие expedition-действия сейчас реально двигают гильдейские контракты, а не просто дают очередной isolated run."
         aside={<Pill tone={expeditionContracts.some((contract) => contract.claimable) ? "success" : "accent"}>{`${expeditionContracts.length} linked`}</Pill>}
+        tone={expeditionContracts.some((contract) => contract.claimable) ? "success" : "accent"}
       >
         <div className="stack-sm">
           {expeditionContracts.map((contract) => (
@@ -265,6 +301,12 @@ export default async function ExpeditionPage({
         title="Ротация и второй состав"
         description="Ростер шире трёх героев превращает экспедиции в более гибкий loop: можно подбирать роли под зоны и не упираться в один активный поход."
         aside={<Pill tone={data.rosterProgression.reserveLoopUnlocked ? "success" : "warning"}>{`${data.rosterProgression.totalHeroes}/${data.rosterProgression.reserveLoopTarget}`}</Pill>}
+        actions={
+          <Link className="button button--ghost" href="/heroes">
+            Открыть ростер
+          </Link>
+        }
+        tone={data.rosterProgression.reserveLoopUnlocked ? "success" : "warning"}
       >
         <p className="muted">
           {data.rosterProgression.reserveLoopUnlocked
@@ -277,6 +319,7 @@ export default async function ExpeditionPage({
         title="Zone progression"
         description="PvE-линейка теперь включает не только новые зоны, но и сценарные ответвления с отдельным risk/reward-профилем."
         aside={<Pill tone={data.zoneProgression.nextLocationName ? "accent" : "success"}>{data.zoneProgression.statusLabel}</Pill>}
+        tone={data.zoneProgression.nextLocationName ? "accent" : "success"}
       >
         <p className="muted">
           {data.zoneProgression.nextGoalLabel ?? "Текущая MVP-цепочка зон уже полностью открыта."}
@@ -286,7 +329,7 @@ export default async function ExpeditionPage({
         </p>
       </SectionCard>
 
-      <SectionCard title="Новые PvE-сценарии" description="Эти маршруты расширяют горизонт поверх базовых зон и меняют не только цифры, но и профиль награды.">
+      <SectionCard title="Новые PvE-сценарии" description="Эти маршруты расширяют горизонт поверх базовых зон и меняют не только цифры, но и профиль награды." tone="accent">
         <div className="stack-sm">
           {data.locations
             .filter((location) => location.scenarioLabel !== "Стандартная экспедиция")
@@ -313,7 +356,16 @@ export default async function ExpeditionPage({
       </SectionCard>
 
       <div className="content-grid content-grid--two-thirds">
-        <SectionCard title="Запуск новой экспедиции" description="Выберите открытую локацию и ровно трёх свободных героев из ростера.">
+        <SectionCard
+          title="Запуск новой экспедиции"
+          description="Выберите открытую локацию и ровно трёх свободных героев из ростера."
+          actions={
+            <Link className="button button--ghost" href="/heroes">
+              Управлять героями
+            </Link>
+          }
+          tone="accent"
+        >
           {data.availableHeroes.length >= 3 ? (
             <form action={startExpedition} className="card-form">
               <input type="hidden" name="redirectTo" value="/expedition" />
@@ -366,11 +418,16 @@ export default async function ExpeditionPage({
             <EmptyState
               title="Недостаточно свободных героев"
               description={startMilestone?.blockers[0] ?? "Дождитесь завершения текущих походов или сначала заберите уже готовые экспедиции."}
+              action={
+                <Link className="button button--ghost" href="/heroes">
+                  Открыть ростер
+                </Link>
+              }
             />
           )}
         </SectionCard>
 
-        <SectionCard title="Доступные локации" description="У каждой зоны теперь есть не только профиль угроз, но и читаемый сценарный модификатор с отдельным payoff-профилем.">
+        <SectionCard title="Доступные локации" description="У каждой зоны теперь есть не только профиль угроз, но и читаемый сценарный модификатор с отдельным payoff-профилем." tone="neutral">
           <div className="stack-sm">
             {data.locations.map((location) => (
               <article key={location.id} className="row-card">
@@ -427,7 +484,7 @@ export default async function ExpeditionPage({
         </SectionCard>
       </div>
 
-      <SectionCard title="История и текущие забеги" description="Активные, завершённые и уже забранные походы сохраняются в одном списке вместе с risk/reward-профилем, прогнозом XP и боевым отчётом.">
+      <SectionCard title="История и текущие забеги" description="Активные, завершённые и уже забранные походы сохраняются в одном списке вместе с risk/reward-профилем, прогнозом XP и боевым отчётом." tone="neutral">
         {data.expeditions.length > 0 ? (
           <div className="stack-sm">
             {data.expeditions.map((expedition) => (

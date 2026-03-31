@@ -41,6 +41,20 @@ export default async function GuildDirectoryPage({
         eyebrow="Guild directory"
         title="Публичные гильдии, renown loop и social leaderboard-слой"
         description="Каталог теперь показывает не только силу и богатство, но и повторную social ценность: какие гильдии собирают familiar-house renown, кто возвращает к себе контрагентов сериями и где уже появились любимые дома мира."
+        badges={
+          <>
+            <Pill tone="accent">{data.worldEventBoard.season.label}</Pill>
+            <Pill tone={data.watchlist.count > 0 ? "success" : "accent"}>{`${data.watchlist.count}/${data.watchlist.maxCount} watchlist`}</Pill>
+            <Pill tone="success">{data.community.guildCount} домов visible</Pill>
+          </>
+        }
+        meta={
+          <>
+            <span>{data.community.playerCount} игроков visible</span>
+            <span>• {data.community.renownLeaders} renown leaders</span>
+            <span>• {data.worldEventBoard.summary.claimableRewardCount} reward-ready</span>
+          </>
+        }
         actions={
           <>
             <Link className="button button--primary" href="/market">
@@ -53,21 +67,21 @@ export default async function GuildDirectoryPage({
         }
       />
 
-      {feedback ? <Notice tone={feedback.tone}>{feedback.message}</Notice> : null}
+      {feedback ? <Notice title="Результат действия" tone={feedback.tone}>{feedback.message}</Notice> : null}
 
-      <Notice tone="accent">
+      <Notice title="Renown loop" tone="accent">
         Renown и social memory собираются поверх уже существующих market sales, fulfilled buy orders, accepted deals, контрактов и PvE: без тяжёлого нового backend-а, но с понятной social visibility и причинами возвращаться не в пустой рынок, а к знакомым домам.
       </Notice>
 
-      <Notice tone="success">
+      <Notice title="Diplomacy-lite" tone="success">
         Diplomacy-lite добавляет ещё один relational слой: endorsements поднимают знакомые дома в trust/public status, а rivalry tags создают мягкие причины следить за соседями по prestige и seasonal board без ввода guild wars.
       </Notice>
 
-      <Notice tone={data.watchlist.count > 0 ? (data.watchlist.isAutoSeeded ? "success" : "accent") : "neutral"}>
+      <Notice title="Watchlist / follow layer" tone={data.watchlist.count > 0 ? (data.watchlist.isAutoSeeded ? "success" : "accent") : "neutral"}>
         <strong>{data.watchlist.storageLabel}.</strong> {data.watchlist.summary} {data.watchlist.helperText}
       </Notice>
 
-      <Notice tone="success">
+      <Notice title="World events" tone="success">
         <strong>{data.worldEventBoard.season.label}.</strong> Public world events собирают общий social pressure:
         кто ведёт frontier, кто двигает рынок и кто конвертирует контракты с workshop в civic growth.
       </Notice>
@@ -113,6 +127,12 @@ export default async function GuildDirectoryPage({
         title="Seasonal board / world events"
         description={data.worldEventBoard.season.summary}
         aside={<Pill tone={data.worldEventBoard.summary.claimableRewardCount > 0 ? "success" : "accent"}>{data.worldEventBoard.season.label}</Pill>}
+        actions={
+          <Link className="button button--ghost" href="/dashboard">
+            Назад к личному board
+          </Link>
+        }
+        tone="accent"
       >
         <div className="stack-sm">
           {data.worldEventBoard.events.map((event) => {
@@ -165,6 +185,7 @@ export default async function GuildDirectoryPage({
         title="Watchlist / follow layer"
         description={data.watchlist.summary}
         aside={<Pill tone={data.watchlist.count > 0 ? "accent" : "neutral"}>{`${data.watchlist.count}/${data.watchlist.maxCount}`}</Pill>}
+        tone="accent"
       >
         <div className="stack-sm">
           {data.followedGuilds.length > 0 ? (
@@ -247,6 +268,7 @@ export default async function GuildDirectoryPage({
             title={leaderboard.title}
             description={leaderboard.description}
             aside={<Pill tone="accent">{leaderboard.metricLabel}</Pill>}
+            tone="neutral"
           >
             <div className="stack-sm">
               {leaderboard.entries.map((entry) => (
@@ -289,6 +311,7 @@ export default async function GuildDirectoryPage({
       <SectionCard
         title="Каталог гильдий"
         description="Каждая гильдия получает своё лицо: public title, crest theme, signature color, motto и hall description теперь работают как быстрые identity cues для каталога и social discovery."
+        tone="accent"
       >
         <div className="stack-sm">
           {data.guilds.map((guild) => (
@@ -358,10 +381,10 @@ export default async function GuildDirectoryPage({
                       guildTag={guild.guildTag}
                       relation={guild.viewerDiplomacy?.relation ?? "neutral"}
                       redirectTo="/guilds"
-                      endorseLabel="Endorse"
-                      rivalLabel="Rival"
-                      unrivalLabel="Unrival"
-                      clearLabel="Neutral"
+                      endorseLabel="Поддержать"
+                      rivalLabel="Пометить rival"
+                      unrivalLabel="Снять rival"
+                      clearLabel="Сбросить связь"
                     />
                   </>
                 ) : null}
@@ -383,6 +406,7 @@ export default async function GuildDirectoryPage({
       <SectionCard
         title="Каталог игроков"
         description="Display name владельца теперь считывается вместе с prestige его гильдии: видно, кто стоит за trusted trader, contract house или rising guild-статусом."
+        tone="neutral"
       >
         <div className="stack-sm">
           {data.players.map((player) => (

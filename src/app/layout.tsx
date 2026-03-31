@@ -36,7 +36,10 @@ export default async function RootLayout({
 
   return (
     <html lang="ru" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body>
+      <body className="app-body">
+        <a className="skip-link" href="#main-content">
+          Перейти к основному содержимому
+        </a>
         <AppShell shellContext={shellContext}>{children}</AppShell>
       </body>
     </html>

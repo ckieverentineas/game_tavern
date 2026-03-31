@@ -70,6 +70,57 @@ export const APP_NAVIGATION = [
   },
 ] as const;
 
+export const QUICK_TUTORIAL_STEPS = [
+  {
+    key: "roster",
+    title: "Соберите и проверьте ростер",
+    description:
+      "На экране героев видно, кто уже готов к походу, где узкое место по слотам и кому нужна экипировка перед первым рейсом.",
+    href: "/heroes",
+    actionLabel: "Открыть ростер",
+  },
+  {
+    key: "expedition",
+    title: "Запустите первую экспедицию",
+    description:
+      "Экспедиции двигают PvE-прогрессию, XP героев, редкие материалы и часть контрактов, поэтому это лучший первый цикл после сборки партии.",
+    href: "/expedition",
+    actionLabel: "Перейти к экспедициям",
+  },
+  {
+    key: "market",
+    title: "Продайте лишнее или создайте спрос",
+    description:
+      "Рынок покрывает два быстрых сценария: выставить предмет/ресурс на витрину или открыть buy order на нужный supply.",
+    href: "/market",
+    actionLabel: "Открыть рынок",
+  },
+  {
+    key: "workshop",
+    title: "Усильте лучший предмет в workshop",
+    description:
+      "Inventory помогает быстро понять, что выгоднее вложить в power, а что — безопасно отправить в торговлю.",
+    href: "/inventory",
+    actionLabel: "Открыть inventory",
+  },
+  {
+    key: "deals",
+    title: "Используйте private deals для точечных обменов",
+    description:
+      "Сделки нужны для адресного barter-обмена с конкретным домом, когда хочется закрыть дефицит без открытого рынка.",
+    href: "/deals",
+    actionLabel: "Открыть deals",
+  },
+  {
+    key: "social",
+    title: "Следите за домами и world events",
+    description:
+      "Каталог гильдий, watchlist и diplomacy cues помогают не потеряться в social-first слое и быстро выбрать знакомые дома для торговли.",
+    href: "/guilds",
+    actionLabel: "Открыть каталог гильдий",
+  },
+] as const;
+
 export const STARTER_ARCHETYPES = [
   {
     heroClass: "VANGUARD",

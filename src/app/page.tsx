@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { TutorialLayer } from "@/components/tutorial-layer";
 import { InfoCard, Notice, PageHeader, Pill, SectionCard } from "@/components/ui";
 import {
   APP_NAVIGATION,
   FOUNDATION_ACTIONS,
   FOUNDATION_BOUNDARIES,
   FOUNDATION_CHECKLIST,
+  QUICK_TUTORIAL_STEPS,
   STARTER_ARCHETYPES,
 } from "@/lib/domain";
 import {
@@ -60,6 +62,28 @@ export default async function Home({
             ? "После входа игра работает в вашем собственном user/guild контексте: dashboard, рынок, сделки и progression читаются без глобального demo fallback."
             : "Личный аккаунт остаётся доступным, но сейчас открыт sandbox-режим для локальной проверки seeded-гильдий и двухсторонних market/deals сценариев."
           : "Точка входа теперь объединяет локальный signup/login, мгновенный bootstrap стартовой гильдии и сохранившийся demo sandbox для разработки и демонстрации."}
+        badges={
+          <>
+            <Pill tone={shellContext.viewer ? (isAuthenticatedMode ? "success" : "accent") : "accent"}>
+              {shellContext.viewer ? (isAuthenticatedMode ? "Account session" : "Demo sandbox") : "Quick start"}
+            </Pill>
+            <Pill tone={snapshot.ok ? (onboarding?.isActive ? "accent" : "success") : "warning"}>
+              {snapshot.ok ? onboarding?.progressLabel ?? "Snapshot ready" : "Нужна база"}
+            </Pill>
+          </>
+        }
+        meta={
+          snapshot.ok ? (
+            <>
+              <span>Lv. {snapshot.data.guild.level}</span>
+              <span>• {formatNumber(snapshot.data.guild.gold)} золота</span>
+              <span>• {snapshot.data.activeExpeditions.length} активных походов</span>
+              <span>• {snapshot.data.claimableExpeditions.length} claim-ready</span>
+            </>
+          ) : (
+            <>Auth, demo sandbox и social discovery уже собраны в единый первый вход.</>
+          )
+        }
         actions={
           <>
             <Link className="button button--primary" href="/dashboard">
@@ -110,21 +134,21 @@ export default async function Home({
         }
       />
 
-      {feedback ? <Notice tone={feedback.tone}>{feedback.message}</Notice> : null}
+      {feedback ? <Notice title="Результат действия" tone={feedback.tone}>{feedback.message}</Notice> : null}
 
       {shellContext.viewer ? (
-        <Notice tone={isAuthenticatedMode ? "success" : "accent"}>
+        <Notice title="Текущий режим" tone={isAuthenticatedMode ? "success" : "accent"}>
           {isAuthenticatedMode
             ? `Авторизован аккаунт ${shellContext.viewer.displayName}. Все игровые экраны используют вашу гильдию ${viewerGuildLabel ?? "безымянный контекст"}.`
             : `Вы вошли как ${shellContext.viewer.displayName}, но сейчас открыт demo sandbox. Sandbox не смешивает ваш аккаунт с seeded-гильдиями и в любой момент переключается обратно.`}
         </Notice>
       ) : (
-        <Notice tone="accent">
+        <Notice title="Как войти в продукт" tone="accent">
           Если хотите проверить реальные account/guild данные, зарегистрируйте локальный аккаунт ниже. Для быстрой демонстрации без входа остаётся demo sandbox, где виден тот же guided first-session flow.
         </Notice>
       )}
 
-      <Notice tone="success">
+      <Notice title="Community layer" tone="success">
         У игры появился public community layer: каталог гильдий, каталог игроков, статусные лидерборды и сезонный world event board уже читаются поверх текущих экономики, PvE, workshop и контрактов через dashboard и экран `/guilds`.
       </Notice>
 
@@ -134,6 +158,7 @@ export default async function Home({
             title="Создать локальный аккаунт и стартовую гильдию"
             description="Signup сразу создаёт пользователя, cookie-based session и полностью играбельный guild bootstrap."
             aside={<Pill tone="success">alpha-ready</Pill>}
+            tone="success"
           >
             <form action={signup} className="card-form">
               <input type="hidden" name="redirectTo" value="/dashboard" />
@@ -165,6 +190,7 @@ export default async function Home({
           <SectionCard
             title="Войти в существующий аккаунт"
             description="Login восстанавливает личный guild context и переключает shell из sandbox в account-режим."
+            tone="neutral"
           >
             <form action={login} className="card-form">
               <input type="hidden" name="redirectTo" value="/dashboard" />
@@ -187,6 +213,7 @@ export default async function Home({
           title="Текущий account state"
           description="Локальная alpha-сессия и demo sandbox теперь живут рядом, но читаются как разные контексты."
           aside={<Pill tone={isAuthenticatedMode ? "success" : "accent"}>{isAuthenticatedMode ? "Account mode" : "Demo mode"}</Pill>}
+          tone={isAuthenticatedMode ? "success" : "accent"}
         >
           <div className="stack-sm">
             <article className="row-card">
@@ -232,8 +259,8 @@ export default async function Home({
       )}
 
       <SectionCard
-        title="Demo sandbox"
-        description="Managed demo guilds остаются доступными для локальной проверки двусторонних market/deals loop-ов и быстрых демонстраций без ручного SQL."
+          title="Demo sandbox"
+          description="Managed demo guilds остаются доступными для локальной проверки двусторонних market/deals loop-ов и быстрых демонстраций без ручного SQL."
         aside={
           <Pill tone={shellContext.demoContext.ready ? "success" : "warning"}>
             {shellContext.demoContext.ready
@@ -241,6 +268,7 @@ export default async function Home({
               : "sandbox offline"}
           </Pill>
         }
+        tone={shellContext.demoContext.ready ? "accent" : "warning"}
       >
         <div className="stack-sm">
           <p className="muted">
@@ -306,6 +334,7 @@ export default async function Home({
           title="Локальные игровые данные ещё не подняты"
           description={snapshot.error}
           aside={<Pill tone="warning">Нужен `npm run db:setup`</Pill>}
+          tone="warning"
         >
           <p className="muted">
             Auth-flow, demo sandbox и игровые экраны готовы, но SQLite foundation нужно инициализировать перед полноценной проверкой проекта.
@@ -319,6 +348,12 @@ export default async function Home({
             title="Первые 5–10 минут"
             description={onboarding?.summary ?? "Стартовый first-session board загрузится вместе с игровым snapshot."}
             aside={<Pill tone={onboarding?.isActive ? "accent" : "success"}>{onboarding?.progressLabel ?? "snapshot"}</Pill>}
+            actions={
+              <Link className="button button--ghost" href={onboarding?.recommendedAction?.href ?? "/dashboard"}>
+                {onboarding?.recommendedAction?.actionLabel ?? "Открыть dashboard"}
+              </Link>
+            }
+            tone={onboarding?.isActive ? "accent" : "success"}
           >
             <div className="stack-sm">
               {onboarding?.recommendedAction ? (
@@ -428,6 +463,7 @@ export default async function Home({
         <SectionCard
           title="Ключевые маршруты foundation-shell"
           description="Каждый экран уже оформлен как стартовая игровая панель и одинаково доступен для личного аккаунта и demo sandbox."
+          tone="accent"
         >
         <div className="route-grid">
           {APP_NAVIGATION.filter((item) => item.href !== "/").map((item) => (
@@ -446,6 +482,7 @@ export default async function Home({
         <SectionCard
           title="Стартовая партия MVP"
           description="Эти три архетипа теперь используются и в seeded demo, и в bootstrap новой пользовательской гильдии."
+          tone="accent"
         >
           <div className="stack-sm">
             {STARTER_ARCHETYPES.map((hero) => (
@@ -466,6 +503,7 @@ export default async function Home({
         <SectionCard
           title="Активные server actions"
           description="Auth, sandbox switching и gameplay actions ведут к реальным мутациям экономики, инвентаря и прогрессии."
+          tone="neutral"
         >
           <div className="token-list">
             {FOUNDATION_ACTIONS.map((action) => (
@@ -476,6 +514,18 @@ export default async function Home({
           </div>
         </SectionCard>
       </div>
+
+      {!shellContext.viewer || onboarding?.isActive ? (
+        <TutorialLayer
+          storageKey="guild-exchange-quick-tutorial-v1"
+          title="Быстрый маршрут новичка"
+          description={
+            onboarding?.summary
+            ?? "За несколько экранов можно собрать ростер, отправить первый поход, продать излишки и выбрать дома для social-first цикла."
+          }
+          steps={QUICK_TUTORIAL_STEPS}
+        />
+      ) : null}
     </div>
   );
 }

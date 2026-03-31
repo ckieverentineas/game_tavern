@@ -50,6 +50,21 @@ export default async function GuildPublicProfilePage({
         eyebrow="Guild profile"
         title={`${data.guild.name} [${data.guild.tag}]`}
         description="Публичная social-memory витрина гильдии: owner, renown/perstige tiers, favorite traders, recurring links, badges/perks, часть ростера и мягкие CTA в уже существующие loops взаимодействия."
+        badges={
+          <>
+            <Pill tone={data.prestige.tone}>{data.prestige.tierLabel}</Pill>
+            <Pill tone={data.renown.tone}>{data.renown.tierLabel}</Pill>
+            <Pill tone={data.diplomacy.tone}>{data.diplomacy.statusLabel}</Pill>
+          </>
+        }
+        meta={
+          <>
+            <span>Lv. {data.guild.level}</span>
+            <span>• {formatNumber(data.guild.gold)} золота</span>
+            <span>• {formatNumber(data.guild.rosterPower)} roster power</span>
+            <span>• {data.guild.heroCount} героев</span>
+          </>
+        }
         actions={
           <>
             <Link className="button button--primary" href={data.socialCtas.marketHref}>
@@ -68,10 +83,10 @@ export default async function GuildPublicProfilePage({
                   guildTag={data.guild.tag}
                   relation={viewerRelation}
                   redirectTo={`/guilds/${encodeURIComponent(data.guild.tag)}`}
-                  endorseLabel="Endorse"
-                  rivalLabel="Tag rival"
+                  endorseLabel="Поддержать дом"
+                  rivalLabel="Пометить rival"
                   unrivalLabel="Убрать rival"
-                  clearLabel="Neutral"
+                  clearLabel="Сбросить связь"
                 />
               </>
             ) : null}
@@ -85,7 +100,7 @@ export default async function GuildPublicProfilePage({
         }
       />
 
-      {feedback ? <Notice tone={feedback.tone}>{feedback.message}</Notice> : null}
+      {feedback ? <Notice title="Результат действия" tone={feedback.tone}>{feedback.message}</Notice> : null}
 
       <section className="identity-showcase" style={getGuildIdentitySurfaceStyle(data.guild.identity)}>
         <div className="identity-showcase__header">
@@ -116,43 +131,43 @@ export default async function GuildPublicProfilePage({
         </div>
       </section>
 
-      <Notice tone={data.guild.isCurrentContext ? "success" : "accent"}>
+      <Notice title="Позиция в мире" tone={data.guild.isCurrentContext ? "success" : "accent"}>
         {data.guild.isCurrentContext
           ? "Это публичная версия вашей текущей гильдии: теперь её статус, reputation и social visibility читаются так же, как у остальных."
           : `Гильдия ${data.guild.name} [${data.guild.tag}] видна публично и теперь сразу объясняет, почему она статусна как контрагент, supplier или frontier-имя.`}
       </Notice>
 
       {!data.guild.isCurrentContext ? (
-        <Notice tone={data.isWatched ? "success" : "accent"}>
+        <Notice title="Watchlist status" tone={data.isWatched ? "success" : "accent"}>
           <strong>{data.watchlist.storageLabel}.</strong> {data.isWatched
             ? `${data.guild.name} [${data.guild.tag}] уже в вашем watchlist и будет появляться в персональной social activity ленте на dashboard.`
             : `${data.guild.name} [${data.guild.tag}] ещё не отслеживается. Добавьте дом в watchlist, чтобы возвращаться за его market, deal, contract и frontier activity.`}
         </Notice>
       ) : null}
 
-      <Notice tone={data.prestige.tone}>
+      <Notice title="Prestige" tone={data.prestige.tone}>
         <strong>{data.prestige.tierLabel}.</strong> {data.prestige.spotlight}
       </Notice>
 
-      <Notice tone={data.renown.tone}>
+      <Notice title="Renown" tone={data.renown.tone}>
         <strong>{data.renown.tierLabel}.</strong> {data.renown.spotlight}
       </Notice>
 
-      <Notice tone={data.diplomacy.tone}>
+      <Notice title="Diplomacy" tone={data.diplomacy.tone}>
         <strong>{data.diplomacy.statusLabel}.</strong> {data.diplomacy.spotlight}
       </Notice>
 
       {data.viewerDiplomacy ? (
-        <Notice tone={viewerRelationTone}>
+        <Notice title="Viewer relation" tone={viewerRelationTone}>
           <strong>{data.viewerDiplomacy.relationLabel}.</strong> {data.viewerDiplomacy.summary}
         </Notice>
       ) : null}
 
-      <Notice tone={data.courier.tone}>
+      <Notice title="Courier route" tone={data.courier.tone}>
         <strong>{data.courier.statusLabel}.</strong> {data.courier.summary} {data.courier.spotlight}
       </Notice>
 
-      <Notice tone="accent">
+      <Notice title="Seasonal status" tone="accent">
         <strong>{data.worldEventBoard.season.label}.</strong> Профиль теперь показывает не только prestige-историю,
         но и текущий seasonal status этой гильдии в глобальных world events.
       </Notice>
@@ -217,6 +232,7 @@ export default async function GuildPublicProfilePage({
           title="Diplomacy snapshot"
           description="Лёгкий relational слой поверх существующих loops: endorsements усиливают trust/familiarity, rivalry tags добавляют мягкое соревновательное давление без PvP-войн."
           aside={<Pill tone={data.diplomacy.tone}>{data.diplomacy.statusLabel}</Pill>}
+          tone={data.diplomacy.tone}
         >
           <div className="stack-sm">
             <article className="row-card">
@@ -266,6 +282,7 @@ export default async function GuildPublicProfilePage({
           title="Renown / retention loop"
           description="Renown не про raw power, а про повторные связи: familiar houses, preferred trader callouts, social badges и memory recap без лома баланса."
           aside={<Pill tone={data.renown.tone}>{data.renown.tierLabel}</Pill>}
+          tone="success"
         >
           <div className="stack-sm">
             <article className="row-card">
@@ -316,6 +333,7 @@ export default async function GuildPublicProfilePage({
           title="Friendly courier route"
           description="Courier packages добавляют мягкий social-first loop помощи между дружественными домами: только ограниченные ресурсы, явный sender/receiver, записка и claim-history без превращения профиля в free-trade backend."
           aside={<Pill tone={data.courier.tone}>{data.courier.statusLabel}</Pill>}
+          tone="accent"
         >
           <div className="stack-sm">
             <article className="row-card">
@@ -451,6 +469,7 @@ export default async function GuildPublicProfilePage({
           title="Social identity snapshot"
           description="Identity теперь не скрыта в настройках: profile сразу показывает framing дома, crest/theme и public copy, по которым его запоминают другие игроки."
           aside={<Pill tone={data.prestige.tone}>{data.prestige.tierLabel}</Pill>}
+          tone="accent"
         >
           <div className="stack-sm">
             <article className="row-card">
@@ -498,6 +517,7 @@ export default async function GuildPublicProfilePage({
         <SectionCard
           title="Favorite traders / recurring links"
           description="Любимые дома появляются из repeated market sales, fulfilled demand и accepted deals. Это мягкий retention hook: хочется вернуться именно к знакомым контрагентам."
+          tone="success"
         >
           {data.favoriteTraders.length > 0 ? (
             <div className="stack-sm">
@@ -538,6 +558,7 @@ export default async function GuildPublicProfilePage({
         <SectionCard
           title="Prestige breakdown"
           description="Репутация не скрыта за чёрным ящиком: видно, какие существующие loops реально строят public trust и status для этой гильдии."
+          tone="neutral"
         >
           <div className="stack-sm">
             {data.prestige.rankingContributions.map((contribution) => (

@@ -50,6 +50,20 @@ export default async function DealsPage({
         eyebrow="Deals"
         title={`${data.guildName} [${data.guildTag}] · приватные barter-сделки`}
         description="Inbox, outbox и история сделки показываются строго от лица активной гильдии, чтобы проверять social/economy loop с обеих сторон без путаницы."
+        badges={
+          <>
+            <Pill tone={data.tradeUnlocked ? "success" : "warning"}>{data.tradeUnlocked ? "Deals open" : "Deals locked"}</Pill>
+            <Pill tone={data.pendingIncoming.length > 0 ? "success" : "accent"}>{`${data.pendingIncoming.length} incoming`}</Pill>
+            {data.prefillReceiverLabel ? <Pill tone="accent">Target prefilled</Pill> : null}
+          </>
+        }
+        meta={
+          <>
+            <span>{data.pendingOutgoing.length} исходящих</span>
+            <span>• {data.resolvedOffers.length} resolved</span>
+            <span>• {data.counterparties.length} доступных контрагентов</span>
+          </>
+        }
         actions={
           <>
             <Link className="button button--primary" href="/inventory">
@@ -67,28 +81,28 @@ export default async function DealsPage({
         }
       />
 
-      {feedback ? <Notice tone={feedback.tone}>{feedback.message}</Notice> : null}
+      {feedback ? <Notice title="Результат действия" tone={feedback.tone}>{feedback.message}</Notice> : null}
 
-      <Notice tone="accent">
+      <Notice title="Текущая перспектива" tone="accent">
         Активная перспектива: {data.guildName} [{data.guildTag}]. Входящие, исходящие и доступные
         контрагенты пересчитываются для выбранной гильдии. В demo sandbox shell позволяет принять тот
         же оффер глазами второй стороны, а в account-режиме экран остаётся строго вашим личным контекстом.
       </Notice>
 
       {data.guildPrestige ? (
-        <Notice tone={data.guildPrestige.prestige.tone}>
+        <Notice title="Prestige" tone={data.guildPrestige.prestige.tone}>
           <strong>{data.guildPrestige.prestige.tierLabel}.</strong> {data.guildPrestige.prestige.spotlight}
         </Notice>
       ) : null}
 
       {data.guildPrestige ? (
-        <Notice tone={data.guildPrestige.renown.tone}>
+        <Notice title="Renown" tone={data.guildPrestige.renown.tone}>
           <strong>{data.guildPrestige.renown.tierLabel}.</strong> {data.guildPrestige.renown.spotlight}
         </Notice>
       ) : null}
 
       {data.prefillReceiverLabel ? (
-        <Notice tone="success">
+        <Notice title="Social CTA" tone="success">
           Social CTA подхватил публичную гильдию {data.prefillReceiverLabel}: форма ниже уже готова к
           созданию private deal именно с ней.
         </Notice>
@@ -106,6 +120,7 @@ export default async function DealsPage({
           title="Favorite traders for private deals"
           description="Здесь сначала вспоминаются знакомые дома, с которыми уже сложилась социальная история. Это превращает deals в серию отношений, а не в одноразовый barter."
           aside={<Pill tone={data.guildPrestige.renown.tone}>{data.guildPrestige.renown.tierLabel}</Pill>}
+          tone="success"
         >
           <div className="stack-sm">
             {data.guildPrestige.favoriteCounterparties.map((counterparty) => (
@@ -136,7 +151,11 @@ export default async function DealsPage({
       ) : null}
 
       <div className="content-grid content-grid--two-thirds">
-        <SectionCard title="Создать новый оффер" description="Заполните только один блок отдачи и один блок запроса: предмет или ресурс с количеством.">
+        <SectionCard
+          title="Создать новый оффер"
+          description="Заполните только один блок отдачи и один блок запроса: предмет или ресурс с количеством."
+          tone="accent"
+        >
           <form action={createTradeOffer} className="card-form">
             <input type="hidden" name="redirectTo" value="/deals" />
             <label className="form-field">
@@ -216,7 +235,7 @@ export default async function DealsPage({
           </form>
         </SectionCard>
 
-        <SectionCard title="Pending incoming deals" description="Inbox адресных офферов, на которые нужно принять решение до истечения таймера.">
+        <SectionCard title="Pending incoming deals" description="Inbox адресных офферов, на которые нужно принять решение до истечения таймера." tone="success">
           {data.pendingIncoming.length > 0 ? (
             <div className="stack-sm">
               {data.pendingIncoming.map((offer) => (
@@ -263,7 +282,7 @@ export default async function DealsPage({
           )}
         </SectionCard>
 
-        <SectionCard title="Pending outgoing deals" description="Outbox показывает, какие ваши офферы ещё ждут ответа и могут быть отменены вручную.">
+        <SectionCard title="Pending outgoing deals" description="Outbox показывает, какие ваши офферы ещё ждут ответа и могут быть отменены вручную." tone="accent">
           {data.pendingOutgoing.length > 0 ? (
             <div className="stack-sm">
               {data.pendingOutgoing.map((offer) => (
@@ -305,6 +324,7 @@ export default async function DealsPage({
       <SectionCard
         title="Resolved deal history"
         description="История закрытых офферов объясняет outcome человеческим языком: кто был контрагентом, что обменивалось и когда оффер был принят, отклонён, отменён или истёк."
+        tone="neutral"
       >
         {data.resolvedOffers.length > 0 ? (
           <div className="stack-sm">
@@ -345,7 +365,7 @@ export default async function DealsPage({
         )}
       </SectionCard>
 
-      <SectionCard title="Trade rules from spec" description="Foundation не отклоняется от выбранной barter-модели MVP.">
+      <SectionCard title="Trade rules from spec" description="Foundation не отклоняется от выбранной barter-модели MVP." tone="warning">
         <ul className="bullet-list bullet-list--muted">
           {data.ruleSummary.map((item) => (
             <li key={item}>{item}</li>

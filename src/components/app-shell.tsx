@@ -72,10 +72,10 @@ export function AppShell({ children, shellContext }: AppShellProps) {
         <Link className="brand" href="/">
           <span className="brand__eyebrow">{FOUNDATION_STAGE_LABEL}</span>
           <strong>{APP_NAME}</strong>
-          <span className="muted">local alpha idle/management RPG</span>
+          <span className="brand__meta">social-first alpha management RPG</span>
         </Link>
 
-        <div className="sidebar-panel">
+        <div className="sidebar-panel sidebar-panel--highlight">
           <span className={`pill ${shellContext.mode === "authenticated" ? "pill--success" : "pill--accent"}`}>
             {shellContext.mode === "authenticated" ? "Alpha session" : "Demo sandbox"}
           </span>
@@ -216,7 +216,7 @@ export function AppShell({ children, shellContext }: AppShellProps) {
           </div>
         </div>
 
-        <nav className="nav">
+        <nav className="nav" aria-label="Основная навигация">
           {APP_NAVIGATION.map((item) => {
             const isActive =
               item.href === "/"
@@ -228,6 +228,7 @@ export function AppShell({ children, shellContext }: AppShellProps) {
                 key={item.href}
                 className={`nav-link${isActive ? " nav-link--active" : ""}`}
                 href={item.href}
+                aria-current={isActive ? "page" : undefined}
               >
                 <span className="nav-link__label">{item.label}</span>
                 <span className="nav-link__description">{item.description}</span>
@@ -248,7 +249,9 @@ export function AppShell({ children, shellContext }: AppShellProps) {
         </div>
       </aside>
 
-      <main className="shell__main">{children}</main>
+      <main className="shell__main" id="main-content" tabIndex={-1}>
+        <div className="shell__main-inner">{children}</div>
+      </main>
     </div>
   );
 }
